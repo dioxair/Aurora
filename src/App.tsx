@@ -1,4 +1,6 @@
 import "./App.css";
+import { useState, useCallback } from "react";
+import Cropper, { type Area } from "react-easy-crop";
 import {
   Card,
   CardHeader,
@@ -15,6 +17,34 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 
 function App() {
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        setImageSrc(reader.result as string);
+      });
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = useCallback(
+    (croppedArea: Area, croppedAreaPixels: Area) => {
+      setCroppedAreaPixels(croppedAreaPixels);
+    },
+    []
+  );
+
+  const handleCropImage = useCallback(async () => {
+    if (!imageSrc || !croppedAreaPixels) return;
+    console.log("Cropped area in pixels:", croppedAreaPixels);
+  }, [imageSrc, croppedAreaPixels]);
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <div className="min-h-screen flex flex-col items-center justify-center bg-background">
@@ -32,13 +62,33 @@ function App() {
               <TabsList className="mb-4">
                 <TabsTrigger value="crop">Crop</TabsTrigger>
                 <TabsTrigger value="resize">Resize</TabsTrigger>
-                {/* Add more tabs as needed */}
               </TabsList>
               <TabsContent value="crop">
                 <div className="flex flex-col gap-4">
-                  <Input type="file" accept="image/*" />
-                  {/* Image preview and cropper UI will go here */}
-                  <Button>Crop Image</Button>
+                  <Input type="file" accept="image/*" onChange={onFileChange} />
+                  {imageSrc && (
+                    <div className="relative h-64 w-full">
+                      <Cropper
+                        image={imageSrc}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={4 / 3}
+                        onCropChange={setCrop}
+                        onCropComplete={onCropComplete}
+                        onZoomChange={setZoom}
+                        cropShape="rect"
+                        showGrid={true}
+                        classes={{
+                          containerClassName: "rounded-lg",
+                          cropAreaClassName:
+                            "border-2 border-dashed border-white",
+                        }}
+                      />
+                    </div>
+                  )}
+                  <Button onClick={handleCropImage} disabled={!imageSrc}>
+                    Crop Image
+                  </Button>
                 </div>
               </TabsContent>
               <TabsContent value="resize">
