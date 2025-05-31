@@ -6,6 +6,7 @@ import ReactCrop, {
   centerCrop,
   makeAspectCrop,
   convertToPixelCrop,
+  type ReactCropState,
 } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import {
@@ -100,6 +101,20 @@ function App() {
                     onComplete={handleCropComplete}
                     aspect={4 / 3}
                     className="h-full w-full"
+                    ruleOfThirds={true}
+                    renderSelectionAddon={(state: ReactCropState) => (
+                      <div className="react-crop-selection-addon">
+                        {/*
+                        Vertical and horizontal lines stemming from the crosshair
+                        i MIGHT add an option for this later 
+                        
+                        <div className="crosshair-v" />
+                        <div className="crosshair-h" />
+
+                        */}
+                        <div className="crosshair-dot" />
+                      </div>
+                    )}
                   >
                     <img
                       ref={imgRef}
