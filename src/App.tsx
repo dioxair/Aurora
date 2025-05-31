@@ -12,8 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 
 function App() {
@@ -58,48 +56,31 @@ function App() {
           </CardHeader>
           <Separator />
           <CardContent>
-            <Tabs defaultValue="crop" className="w-full">
-              <TabsList className="mb-4">
-                <TabsTrigger value="crop">Crop</TabsTrigger>
-                <TabsTrigger value="resize">Resize</TabsTrigger>
-              </TabsList>
-              <TabsContent value="crop">
-                <div className="flex flex-col gap-4">
-                  <Input type="file" accept="image/*" onChange={onFileChange} />
-                  {imageSrc && (
-                    <div className="relative h-64 w-full">
-                      <Cropper
-                        image={imageSrc}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={4 / 3}
-                        onCropChange={setCrop}
-                        onCropComplete={onCropComplete}
-                        onZoomChange={setZoom}
-                        cropShape="rect"
-                        showGrid={true}
-                        classes={{
-                          containerClassName: "rounded-lg",
-                          cropAreaClassName:
-                            "border-2 border-dashed border-white",
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Button onClick={handleCropImage} disabled={!imageSrc}>
-                    Crop Image
-                  </Button>
+            <div className="flex flex-col gap-4">
+              <Input type="file" accept="image/*" onChange={onFileChange} />
+              {imageSrc && (
+                <div className="relative h-64 w-full">
+                  <Cropper
+                    image={imageSrc}
+                    crop={crop}
+                    zoom={zoom}
+                    aspect={4 / 3}
+                    onCropChange={setCrop}
+                    onCropComplete={onCropComplete}
+                    onZoomChange={setZoom}
+                    cropShape="rect"
+                    showGrid={true}
+                    classes={{
+                      containerClassName: "rounded-lg",
+                      cropAreaClassName: "border-2 border-dashed border-white",
+                    }}
+                  />
                 </div>
-              </TabsContent>
-              <TabsContent value="resize">
-                <Alert>
-                  <AlertTitle>Coming Soon</AlertTitle>
-                  <AlertDescription>
-                    The resize feature will be available in a future update.
-                  </AlertDescription>
-                </Alert>
-              </TabsContent>
-            </Tabs>
+              )}
+              <Button onClick={handleCropImage} disabled={!imageSrc}>
+                Crop Image
+              </Button>
+            </div>
           </CardContent>
           <CardFooter className="flex justify-between">
             <span className="text-xs text-muted-foreground">
