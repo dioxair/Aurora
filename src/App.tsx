@@ -20,6 +20,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 
 function centerAspectCrop(
@@ -46,7 +48,11 @@ function App() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [croppedImage, setCroppedImage] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [tabValue, setTabValue] = useState("crop");
+  const [fileType, setFileType] = useState("image/jpeg");
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -54,7 +60,9 @@ function App() {
       const reader = new FileReader();
       reader.addEventListener("load", () => {
         setImageSrc(reader.result as string);
+        setFileType(file.type);
         setCrop(undefined);
+        setCroppedImage(null);
       });
       reader.readAsDataURL(file);
     }
@@ -63,20 +71,67 @@ function App() {
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
 
-    const newCrop = centerAspectCrop(naturalWidth, naturalHeight, 4 / 3);
-    setCrop(newCrop);
-
-    setCompletedCrop(convertToPixelCrop(newCrop, naturalWidth, naturalHeight));
+    // only set initial crop if no crop exists
+    if (!crop) {
+      const newCrop = centerAspectCrop(naturalWidth, naturalHeight, 4 / 3);
+      setCrop(newCrop);
+      setCompletedCrop(
+        convertToPixelCrop(newCrop, naturalWidth, naturalHeight)
+      );
+    }
   };
 
   const handleCropComplete = useCallback((crop: PixelCrop) => {
     setCompletedCrop(crop);
   }, []);
 
+  const generateCroppedPreview = useCallback(() => {
+    if (
+      !imageSrc ||
+      !completedCrop ||
+      !imgRef.current ||
+      !previewCanvasRef.current
+    ) {
+      return;
+    }
+
+    const image = imgRef.current;
+    const canvas = previewCanvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+
+    // using natural dimensions for good quality crop result
+    const cropWidth = completedCrop.width * scaleX;
+    const cropHeight = completedCrop.height * scaleY;
+
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
+
+    ctx.drawImage(
+      image,
+      // scaleX and scaleY means drawing the cropped area at original resolution
+      completedCrop.x * scaleX,
+      completedCrop.y * scaleY,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      cropWidth,
+      cropHeight
+    );
+
+    setCroppedImage(canvas.toDataURL(fileType));
+  }, [imageSrc, completedCrop, fileType]);
+
   const handleCropImage = useCallback(async () => {
     if (!imageSrc || !completedCrop || !imgRef.current) return;
-    console.log("Cropped area in pixels:", completedCrop);
-  }, [imageSrc, completedCrop]);
+    generateCroppedPreview();
+    setTabValue("preview");
+  }, [imageSrc, completedCrop, generateCroppedPreview]);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -85,51 +140,99 @@ function App() {
           <CardHeader>
             <CardTitle>Anoko</CardTitle>
             <CardDescription>
-              Easily crop and resize your images locally and privately, with a
-              modern UI.
+              Easily crop your images locally and privately, with a modern UI.
             </CardDescription>
           </CardHeader>
           <Separator />
           <CardContent>
-            <div className="flex flex-col gap-4">
-              <Input type="file" accept="image/*" onChange={onFileChange} />
-              {imageSrc && (
-                <div className="relative w-full">
-                  <ReactCrop
-                    crop={crop}
-                    onChange={(c) => setCrop(c)}
-                    onComplete={handleCropComplete}
-                    aspect={4 / 3}
-                    className="h-full w-full"
-                    ruleOfThirds={true}
-                    renderSelectionAddon={(state: ReactCropState) => (
-                      <div className="react-crop-selection-addon">
-                        {/*
-                        Vertical and horizontal lines stemming from the crosshair
-                        i MIGHT add an option for this later 
-                        
-                        <div className="crosshair-v" />
-                        <div className="crosshair-h" />
-
-                        */}
-                        <div className="crosshair-dot" />
-                      </div>
-                    )}
+            <Tabs
+              value={tabValue}
+              onValueChange={setTabValue}
+              className="w-full"
+            >
+              <TabsList className="mb-4">
+                <TabsTrigger value="crop">Crop</TabsTrigger>
+                <TabsTrigger value="preview">Preview/Download</TabsTrigger>
+              </TabsList>
+              <TabsContent value="crop">
+                <div className="flex flex-col gap-4">
+                  <Input type="file" accept="image/*" onChange={onFileChange} />
+                  {imageSrc && (
+                    <div className="relative w-full">
+                      <ReactCrop
+                        crop={crop}
+                        onChange={(c) => setCrop(c)}
+                        onComplete={handleCropComplete}
+                        aspect={4 / 3}
+                        className="h-full w-full"
+                        ruleOfThirds={true}
+                        renderSelectionAddon={(state: ReactCropState) => (
+                          <div className="react-crop-selection-addon">
+                            {/*
+                              Vertical and horizontal lines stemming from the crosshair
+                              i MIGHT add an option for this later 
+                              
+                              <div className="crosshair-v" />
+                              <div className="crosshair-h" />
+      
+                              */}
+                            <div className="crosshair-dot" />
+                          </div>
+                        )}
+                      >
+                        <img
+                          ref={imgRef}
+                          src={imageSrc}
+                          onLoad={onImageLoad}
+                          className="h-full w-full object-contain"
+                          alt="Crop preview"
+                        />
+                      </ReactCrop>
+                    </div>
+                  )}
+                  <Button
+                    onClick={handleCropImage}
+                    disabled={!imageSrc || !crop}
                   >
-                    <img
-                      ref={imgRef}
-                      src={imageSrc}
-                      onLoad={onImageLoad}
-                      className="h-full w-full object-contain"
-                      alt="Crop preview"
-                    />
-                  </ReactCrop>
+                    Generate Preview
+                  </Button>
                 </div>
-              )}
-              <Button onClick={handleCropImage} disabled={!imageSrc || !crop}>
-                Crop Image
-              </Button>
-            </div>
+              </TabsContent>
+              <TabsContent value="preview">
+                <div className="flex flex-col gap-4">
+                  {croppedImage ? (
+                    <>
+                      <div className="relative w-full border rounded-lg overflow-hidden">
+                        <img
+                          src={croppedImage}
+                          className="w-full h-full object-contain"
+                          alt="Cropped preview"
+                        />
+                      </div>
+                      <Button asChild className="w-full">
+                        <a
+                          href={croppedImage}
+                          download={`cropped-image.${
+                            fileType.split("/")[1] || "jpg"
+                          }`}
+                        >
+                          Download Image
+                        </a>
+                      </Button>
+                    </>
+                  ) : (
+                    <Alert>
+                      <AlertTitle>No Preview Available</AlertTitle>
+                      <AlertDescription>
+                        Crop an image first and click "Generate Preview" to see
+                        the result here.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+            <canvas ref={previewCanvasRef} className="hidden" />
           </CardContent>
           <CardFooter className="flex justify-between">
             <span className="text-xs text-muted-foreground">
