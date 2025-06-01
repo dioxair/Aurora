@@ -49,6 +49,7 @@ function App() {
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [croppedImage, setCroppedImage] = useState<string | null>(null);
+  const [originalFileName, setOriginalFileName] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [tabValue, setTabValue] = useState("crop");
@@ -61,6 +62,7 @@ function App() {
       reader.addEventListener("load", () => {
         setImageSrc(reader.result as string);
         setFileType(file.type);
+        setOriginalFileName(file.name);
         setCrop(undefined);
         setCroppedImage(null);
       });
@@ -132,6 +134,19 @@ function App() {
     generateCroppedPreview();
     setTabValue("preview");
   }, [imageSrc, completedCrop, generateCroppedPreview]);
+
+  const getDownloadFileName = () => {
+    if (!originalFileName || !previewCanvasRef.current) {
+      return `cropped-image.${fileType.split("/")[1] || "jpg"}`;
+    }
+
+    const baseName = originalFileName.replace(/\.[^/.]+$/, "");
+    const extension = fileType.split("/")[1] || "jpg";
+    const width = previewCanvasRef.current.width;
+    const height = previewCanvasRef.current.height;
+
+    return `${baseName} (${width}x${height}).${extension}`;
+  };
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -210,12 +225,7 @@ function App() {
                         />
                       </div>
                       <Button asChild className="w-full">
-                        <a
-                          href={croppedImage}
-                          download={`cropped-image.${
-                            fileType.split("/")[1] || "jpg"
-                          }`}
-                        >
+                        <a href={croppedImage} download={getDownloadFileName()}>
                           Download Image
                         </a>
                       </Button>
