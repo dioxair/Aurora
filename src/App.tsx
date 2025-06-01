@@ -353,6 +353,11 @@ function App() {
           `}
         >
           <div className="space-y-4">
+            <h3 className="text-white font-medium">File Picker</h3>
+            <div className="space-y-2">
+              <Input type="file" accept="image/*" onChange={onFileChange} />
+            </div>
+
             <h3 className="text-white font-medium">Crop Selection</h3>
             <div className="space-y-2">
               <Label htmlFor="width">Width</Label>
@@ -390,6 +395,15 @@ function App() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={handleReset}
+              >
+                Reset crop selection
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -413,10 +427,6 @@ function App() {
               />
             </div>
           </div>
-          <Input type="file" accept="image/*" onChange={onFileChange} />
-          <Button variant="secondary" className="w-full" onClick={handleReset}>
-            Reset
-          </Button>
         </div>
 
         {/* Overlay for mobile hamburger menu */}
