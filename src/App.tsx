@@ -6,7 +6,7 @@ import ReactCrop, {
   centerCrop,
   makeAspectCrop,
   convertToPixelCrop,
-  type ReactCropState,
+  //type ReactCropState,
 } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import {
@@ -148,7 +148,9 @@ function App() {
     }
   };
 
-  const onCropChange = (displayPixelCrop: PixelCrop, percentCrop: Crop) => {
+  const onCropChange = (
+    displayPixelCrop: PixelCrop /*, percentCrop: Crop*/
+  ) => {
     setCrop(displayPixelCrop);
     updateSidebarInputs(displayPixelCrop);
   };
@@ -457,9 +459,10 @@ function App() {
                           }
                           className="max-h-full max-w-full"
                           ruleOfThirds={true}
-                          renderSelectionAddon={(state: ReactCropState) => (
-                            <div className="react-crop-selection-addon">
-                              {/*
+                          renderSelectionAddon={
+                            (/*state: ReactCropState*/) => (
+                              <div className="react-crop-selection-addon">
+                                {/*
                                 Vertical and horizontal lines stemming from the crosshair
                                 i MIGHT add an option for this later 
                                 
@@ -467,9 +470,10 @@ function App() {
                                 <div className="crosshair-h" />
         
                                 */}
-                              <div className="crosshair-dot" />
-                            </div>
-                          )}
+                                <div className="crosshair-dot" />
+                              </div>
+                            )
+                          }
                         >
                           <img
                             ref={imgRef}
