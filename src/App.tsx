@@ -399,7 +399,7 @@ function App() {
               />
             </div>
           </div>
-
+          <Input type="file" accept="image/*" onChange={onFileChange} />
           <Button variant="secondary" className="w-full" onClick={handleReset}>
             Reset
           </Button>
@@ -409,7 +409,7 @@ function App() {
         <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden">
           <Card
             className="w-full max-w-lg"
-            style={{ maxHeight: imageSrc ? "none" : "fit-content" }}
+            style={{ maxHeight: "fit-content" }}
           >
             <CardHeader>
               <CardTitle>Aurora</CardTitle>
@@ -430,11 +430,6 @@ function App() {
                 </TabsList>
                 <TabsContent value="crop">
                   <div className="flex flex-col gap-4">
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={onFileChange}
-                    />
                     {imageSrc ? (
                       <div className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px]">
                         <ReactCrop
