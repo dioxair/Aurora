@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Menu as MenuIcon } from "lucide-react";
 
 function centerAspectCrop(
   mediaWidth: number,
@@ -67,6 +68,7 @@ function App() {
   const [cropHeight, setCropHeight] = useState<string>("");
   const [positionX, setPositionX] = useState<string>("");
   const [positionY, setPositionY] = useState<string>("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -253,23 +255,23 @@ function App() {
     const scaleY = image.naturalHeight / image.height;
 
     // using natural dimensions for good quality crop result
-    const cropWidth = completedCrop.width * scaleX;
-    const cropHeight = completedCrop.height * scaleY;
+    const cropWidthValue = completedCrop.width * scaleX;
+    const cropHeightValue = completedCrop.height * scaleY;
 
-    canvas.width = cropWidth;
-    canvas.height = cropHeight;
+    canvas.width = cropWidthValue;
+    canvas.height = cropHeightValue;
 
     ctx.drawImage(
       image,
       // scaleX and scaleY means drawing the cropped area at original resolution
       completedCrop.x * scaleX,
       completedCrop.y * scaleY,
-      cropWidth,
-      cropHeight,
+      cropWidthValue,
+      cropHeightValue,
       0,
       0,
-      cropWidth,
-      cropHeight
+      cropWidthValue,
+      cropHeightValue
     );
 
     setCroppedImage(canvas.toDataURL(fileType));
@@ -335,9 +337,21 @@ function App() {
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <div className="flex h-screen bg-background">
+      <div className="flex md:flex-row h-screen bg-background overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 p-4 border-r flex flex-col gap-6 overflow-y-auto">
+        <div
+          className={`
+            fixed inset-y-0 left-0 z-40 w-3/4 sm:w-64 
+            transform ${
+              isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+            }
+            transition-transform duration-300 ease-in-out
+            bg-background p-4 border-r
+            flex flex-col gap-6 overflow-y-auto
+            md:static md:translate-x-0 md:w-64 md:h-screen 
+            md:border-b-0 md:shrink-0 md:z-auto
+          `}
+        >
           <div className="space-y-4">
             <h3 className="text-white font-medium">Crop Selection</h3>
             <div className="space-y-2">
@@ -405,131 +419,155 @@ function App() {
           </Button>
         </div>
 
+        {/* Overlay for mobile hamburger menu */}
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/50 md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
         {/* Main Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-hidden">
-          <Card
-            className="w-full max-w-lg"
-            style={{ maxHeight: "fit-content" }}
-          >
-            <CardHeader>
-              <CardTitle>Aurora</CardTitle>
-              <CardDescription>
-                Easily crop your images locally and privately, with a modern UI.
-              </CardDescription>
-            </CardHeader>
-            <Separator />
-            <CardContent className={imageSrc ? "flex-1 overflow-auto" : ""}>
-              <Tabs
-                value={tabValue}
-                onValueChange={setTabValue}
-                className="w-full"
-              >
-                <TabsList className="mb-4">
-                  <TabsTrigger value="crop">Crop</TabsTrigger>
-                  <TabsTrigger value="preview">Preview & Download</TabsTrigger>
-                </TabsList>
-                <TabsContent value="crop">
-                  <div className="flex flex-col gap-4">
-                    {imageSrc ? (
-                      <div className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px]">
-                        <ReactCrop
-                          crop={crop}
-                          onChange={onCropChange}
-                          onComplete={handleCropComplete}
-                          aspect={
-                            aspectRatio === "free"
-                              ? undefined
-                              : parseFloat(aspectRatio.split(":")[0]) /
-                                parseFloat(aspectRatio.split(":")[1])
-                          }
-                          className="max-h-full max-w-full"
-                          ruleOfThirds={true}
-                          renderSelectionAddon={
-                            (/*state: ReactCropState*/) => (
-                              <div className="react-crop-selection-addon">
-                                {/*
-                                Vertical and horizontal lines stemming from the crosshair
-                                i MIGHT add an option for this later 
-                                
-                                <div className="crosshair-v" />
-                                <div className="crosshair-h" />
-        
-                                */}
-                                <div className="crosshair-dot" />
-                              </div>
-                            )
-                          }
-                        >
-                          <img
-                            ref={imgRef}
-                            src={imageSrc}
-                            onLoad={onImageLoad}
-                            className="max-h-full max-w-full object-contain"
-                            alt="Crop preview"
-                            style={{
-                              maxHeight: "calc(100vh - 300px)",
-                              maxWidth: "100%",
-                            }}
-                          />
-                        </ReactCrop>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[200px] rounded-lg">
-                        <p>No image selected</p>
-                      </div>
-                    )}
-                    <Button
-                      onClick={handleCropImage}
-                      disabled={!imageSrc || !crop}
-                    >
-                      Generate Preview
-                    </Button>
-                  </div>
-                </TabsContent>
-                <TabsContent value="preview">
-                  <div className="flex flex-col gap-4">
-                    {croppedImage ? (
-                      <>
-                        <div className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px] rounded-lg">
-                          <img
-                            src={croppedImage}
-                            className="max-h-full max-w-full object-contain rounded-lg"
-                            alt="Cropped preview"
-                            style={{
-                              maxHeight: "calc(100vh - 300px)",
-                              maxWidth: "100%",
-                            }}
-                          />
-                        </div>
-                        <Button asChild className="w-full">
-                          <a
-                            href={croppedImage}
-                            download={getDownloadFileName()}
+        <div className="flex-1 flex flex-col overflow-y-auto md:justify-center md:h-auto">
+          <div className="p-2 md:hidden sticky top-0 bg-background z-20 flex items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              <MenuIcon className="h-6 w-6" />
+            </Button>
+            {/* Possible hamburger menu header (ex: <h2 className="ml-2 text-lg font-semibold">Advanced</h2>) */}
+          </div>
+
+          <div className="flex-grow flex flex-col items-center w-full p-2 sm:p-4 md:p-4 md:justify-center">
+            <Card
+              className="w-full max-w-lg"
+              style={{ maxHeight: "fit-content" }}
+            >
+              <CardHeader>
+                <CardTitle>Aurora</CardTitle>
+                <CardDescription>
+                  Easily crop your images locally and privately, with a modern
+                  UI.
+                </CardDescription>
+              </CardHeader>
+              <Separator />
+              <CardContent className={imageSrc ? "flex-1 overflow-auto" : ""}>
+                <Tabs
+                  value={tabValue}
+                  onValueChange={setTabValue}
+                  className="w-full"
+                >
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="crop">Crop</TabsTrigger>
+                    <TabsTrigger value="preview">
+                      Preview & Download
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="crop">
+                    <div className="flex flex-col gap-4">
+                      {imageSrc ? (
+                        <div className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px]">
+                          <ReactCrop
+                            crop={crop}
+                            onChange={onCropChange}
+                            onComplete={handleCropComplete}
+                            aspect={
+                              aspectRatio === "free"
+                                ? undefined
+                                : parseFloat(aspectRatio.split(":")[0]) /
+                                  parseFloat(aspectRatio.split(":")[1])
+                            }
+                            className="max-h-full max-w-full"
+                            ruleOfThirds={true}
+                            renderSelectionAddon={
+                              (/*state: ReactCropState*/) => (
+                                <div className="react-crop-selection-addon">
+                                  {/*
+                                  Vertical and horizontal lines stemming from the crosshair
+                                  i MIGHT add an option for this later 
+                                  
+                                  <div className="crosshair-v" />
+                                  <div className="crosshair-h" />
+          
+                                  */}
+                                  <div className="crosshair-dot" />
+                                </div>
+                              )
+                            }
                           >
-                            Download Image
-                          </a>
-                        </Button>
-                      </>
-                    ) : (
-                      <Alert>
-                        <AlertTitle>No Preview Available</AlertTitle>
-                        <AlertDescription>
-                          Crop an image first and click "Generate Preview" to
-                          see the result here.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-              <canvas ref={previewCanvasRef} className="hidden" />
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <span className="text-xs text-muted-foreground">
-                © 2025 Samuel Olagunju
-              </span>
-            </CardFooter>
-          </Card>
+                            <img
+                              ref={imgRef}
+                              src={imageSrc}
+                              onLoad={onImageLoad}
+                              className="max-h-full max-w-full object-contain"
+                              alt="Crop preview"
+                              style={{
+                                maxHeight: "calc(100vh - 300px)",
+                                maxWidth: "100%",
+                              }}
+                            />
+                          </ReactCrop>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[200px] rounded-lg">
+                          <p>No image selected</p>
+                        </div>
+                      )}
+                      <Button
+                        onClick={handleCropImage}
+                        disabled={!imageSrc || !crop}
+                      >
+                        Generate Preview
+                      </Button>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="preview">
+                    <div className="flex flex-col gap-4">
+                      {croppedImage ? (
+                        <>
+                          <div className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px] rounded-lg">
+                            <img
+                              src={croppedImage}
+                              className="max-h-full max-w-full object-contain rounded-lg"
+                              alt="Cropped preview"
+                              style={{
+                                maxHeight: "calc(100vh - 300px)",
+                                maxWidth: "100%",
+                              }}
+                            />
+                          </div>
+                          <Button asChild className="w-full">
+                            <a
+                              href={croppedImage}
+                              download={getDownloadFileName()}
+                            >
+                              Download Image
+                            </a>
+                          </Button>
+                        </>
+                      ) : (
+                        <Alert>
+                          <AlertTitle>No Preview Available</AlertTitle>
+                          <AlertDescription>
+                            Crop an image first and click "Generate Preview" to
+                            see the result here.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+                <canvas ref={previewCanvasRef} className="hidden" />
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <span className="text-xs text-muted-foreground">
+                  © 2025 Samuel Olagunju
+                </span>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
       </div>
     </ThemeProvider>
