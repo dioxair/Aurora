@@ -422,7 +422,7 @@ function App() {
             style={{ maxHeight: imageSrc ? "none" : "fit-content" }}
           >
             <CardHeader>
-              <CardTitle>Anoko</CardTitle>
+              <CardTitle>Aurora</CardTitle>
               <CardDescription>
                 Easily crop your images locally and privately, with a modern UI.
               </CardDescription>
