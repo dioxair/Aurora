@@ -167,7 +167,7 @@ function App() {
             >
               <TabsList className="mb-4">
                 <TabsTrigger value="crop">Crop</TabsTrigger>
-                <TabsTrigger value="preview">Preview/Download</TabsTrigger>
+                <TabsTrigger value="preview">Preview & Download</TabsTrigger>
               </TabsList>
               <TabsContent value="crop">
                 <div className="flex flex-col gap-4">
