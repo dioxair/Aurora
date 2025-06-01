@@ -84,21 +84,167 @@ function App() {
   };
 
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { naturalWidth, naturalHeight } = e.currentTarget;
+    const imageElement = e.currentTarget;
+    const {
+      naturalWidth,
+      naturalHeight,
+      width: displayWidth,
+      height: displayHeight,
+    } = imageElement;
 
-    // only set initial crop if no crop exists
-    if (!crop) {
-      const newCrop = centerAspectCrop(naturalWidth, naturalHeight, 1 / 1);
-      setCrop(newCrop);
-      setCompletedCrop(
-        convertToPixelCrop(newCrop, naturalWidth, naturalHeight)
+    let initialAspect = 1 / 1;
+    if (aspectRatio !== "free") {
+      const parts = aspectRatio.split(":");
+      if (parts.length === 2) {
+        const num = parseFloat(parts[0]);
+        const den = parseFloat(parts[1]);
+        if (!isNaN(num) && !isNaN(den) && den !== 0) {
+          initialAspect = num / den;
+        }
+      }
+    }
+
+    const newPercentCrop = centerAspectCrop(
+      naturalWidth,
+      naturalHeight,
+      initialAspect
+    );
+    setCrop(newPercentCrop);
+
+    if (displayWidth > 0 && displayHeight > 0) {
+      const initialDisplayPixelCrop = convertToPixelCrop(
+        newPercentCrop,
+        displayWidth,
+        displayHeight
       );
+      setCompletedCrop(initialDisplayPixelCrop);
+    } else {
+      setCompletedCrop(undefined);
+      updateSidebarInputs(undefined);
     }
   };
 
-  const handleCropComplete = useCallback((crop: PixelCrop) => {
-    setCompletedCrop(crop);
+  const updateSidebarInputs = (displayPixelCrop: PixelCrop | undefined) => {
+    if (
+      displayPixelCrop &&
+      imgRef.current &&
+      imgRef.current.width > 0 &&
+      imgRef.current.height > 0
+    ) {
+      const imageElement = imgRef.current;
+      // scale factors :fireinthehole:
+      const scaleX = imageElement.naturalWidth / imageElement.width;
+      const scaleY = imageElement.naturalHeight / imageElement.height;
+
+      setCropWidth(String(Math.round(displayPixelCrop.width * scaleX)));
+      setCropHeight(String(Math.round(displayPixelCrop.height * scaleY)));
+      setPositionX(String(Math.round(displayPixelCrop.x * scaleX)));
+      setPositionY(String(Math.round(displayPixelCrop.y * scaleY)));
+    } else if (!displayPixelCrop) {
+      setCropWidth("");
+      setCropHeight("");
+      setPositionX("");
+      setPositionY("");
+    }
+  };
+
+  const onCropChange = (displayPixelCrop: PixelCrop, percentCrop: Crop) => {
+    setCrop(displayPixelCrop);
+    updateSidebarInputs(displayPixelCrop);
+  };
+
+  const handleCropComplete = useCallback((displayPixelCrop: PixelCrop) => {
+    setCompletedCrop(displayPixelCrop);
+    updateSidebarInputs(displayPixelCrop);
   }, []);
+
+  const handleCropDimensionChange = (
+    inputValue: string,
+    dimension: "width" | "height" | "x" | "y"
+  ) => {
+    if (dimension === "width") setCropWidth(inputValue);
+    else if (dimension === "height") setCropHeight(inputValue);
+    else if (dimension === "x") setPositionX(inputValue);
+    else if (dimension === "y") setPositionY(inputValue);
+
+    const naturalNumericValue = parseInt(inputValue, 10);
+
+    if (
+      !isNaN(naturalNumericValue) &&
+      imgRef.current &&
+      imgRef.current.width > 0 &&
+      imgRef.current.height > 0 &&
+      crop
+    ) {
+      // crop here is the current crop for the display image
+
+      const imageElement = imgRef.current;
+      const scaleX = imageElement.naturalWidth / imageElement.width;
+      const scaleY = imageElement.naturalHeight / imageElement.height;
+
+      setCrop((prevDisplayCrop) => {
+        if (!prevDisplayCrop) return prevDisplayCrop;
+
+        const currentDisplayPixelCrop =
+          prevDisplayCrop.unit === "%"
+            ? convertToPixelCrop(
+                prevDisplayCrop,
+                imageElement.width,
+                imageElement.height
+              )
+            : (prevDisplayCrop as PixelCrop);
+
+        const newDisplayPixelValues: Partial<PixelCrop> = { unit: "px" };
+
+        if (dimension === "width")
+          newDisplayPixelValues.width = naturalNumericValue / scaleX;
+        else if (dimension === "height")
+          newDisplayPixelValues.height = naturalNumericValue / scaleY;
+        else if (dimension === "x")
+          newDisplayPixelValues.x = naturalNumericValue / scaleX;
+        else if (dimension === "y")
+          newDisplayPixelValues.y = naturalNumericValue / scaleY;
+
+        const updatedDisplayCrop = {
+          ...currentDisplayPixelCrop,
+          ...newDisplayPixelValues,
+        } as PixelCrop;
+
+        // here comes a bunch of shit to clamp width and height to the actual image, so fun!!!
+        const displayWidth = imageElement.width;
+        const displayHeight = imageElement.height;
+
+        updatedDisplayCrop.x = Math.max(0, updatedDisplayCrop.x);
+        updatedDisplayCrop.y = Math.max(0, updatedDisplayCrop.y);
+        updatedDisplayCrop.width = Math.max(0, updatedDisplayCrop.width);
+        updatedDisplayCrop.height = Math.max(0, updatedDisplayCrop.height);
+
+        if (updatedDisplayCrop.x + updatedDisplayCrop.width > displayWidth) {
+          updatedDisplayCrop.width = displayWidth - updatedDisplayCrop.x;
+        }
+        if (updatedDisplayCrop.y + updatedDisplayCrop.height > displayHeight) {
+          updatedDisplayCrop.height = displayHeight - updatedDisplayCrop.y;
+        }
+
+        if (updatedDisplayCrop.width < 0) updatedDisplayCrop.width = 0;
+        if (updatedDisplayCrop.height < 0) updatedDisplayCrop.height = 0;
+
+        updatedDisplayCrop.x = Math.min(
+          updatedDisplayCrop.x,
+          displayWidth - updatedDisplayCrop.width
+        );
+        updatedDisplayCrop.y = Math.min(
+          updatedDisplayCrop.y,
+          displayHeight - updatedDisplayCrop.height
+        );
+
+        if (updatedDisplayCrop.x < 0) updatedDisplayCrop.x = 0;
+        if (updatedDisplayCrop.y < 0) updatedDisplayCrop.y = 0;
+
+        return updatedDisplayCrop;
+      });
+    }
+  };
 
   const generateCroppedPreview = useCallback(() => {
     if (
@@ -162,19 +308,37 @@ function App() {
   };
 
   const handleReset = () => {
-    if (imgRef.current && imageSrc) {
-      const { naturalWidth, naturalHeight } = imgRef.current;
-      const newCrop = centerAspectCrop(naturalWidth, naturalHeight, 1 / 1);
-      setCrop(newCrop);
-      setCompletedCrop(
-        convertToPixelCrop(newCrop, naturalWidth, naturalHeight)
+    if (
+      imgRef.current &&
+      imageSrc &&
+      imgRef.current.width > 0 &&
+      imgRef.current.height > 0
+    ) {
+      const imageElement = imgRef.current;
+      const {
+        naturalWidth,
+        naturalHeight,
+        width: displayWidth,
+        height: displayHeight,
+      } = imageElement;
+
+      const newPercentCrop = centerAspectCrop(
+        naturalWidth,
+        naturalHeight,
+        1 / 1
       );
+      setCrop(newPercentCrop);
+
+      const displayEquivalentResetCrop = convertToPixelCrop(
+        newPercentCrop,
+        displayWidth,
+        displayHeight
+      );
+      setCompletedCrop(displayEquivalentResetCrop);
+      updateSidebarInputs(displayEquivalentResetCrop);
+      updateSidebarInputs(undefined);
     }
-    setCropWidth("");
-    setCropHeight("");
-    setPositionX("");
-    setPositionY("");
-    setAspectRatio("free");
+    setAspectRatio("1:1");
   };
 
   return (
@@ -189,7 +353,9 @@ function App() {
               <Input
                 id="width"
                 value={cropWidth}
-                onChange={(e) => setCropWidth(e.target.value)}
+                onChange={(e) =>
+                  handleCropDimensionChange(e.target.value, "width")
+                }
                 placeholder="px"
               />
             </div>
@@ -198,7 +364,9 @@ function App() {
               <Input
                 id="height"
                 value={cropHeight}
-                onChange={(e) => setCropHeight(e.target.value)}
+                onChange={(e) =>
+                  handleCropDimensionChange(e.target.value, "height")
+                }
                 placeholder="px"
               />
             </div>
@@ -225,7 +393,7 @@ function App() {
               <Input
                 id="position-x"
                 value={positionX}
-                onChange={(e) => setPositionX(e.target.value)}
+                onChange={(e) => handleCropDimensionChange(e.target.value, "x")}
                 placeholder="px"
               />
             </div>
@@ -234,7 +402,7 @@ function App() {
               <Input
                 id="position-y"
                 value={positionY}
-                onChange={(e) => setPositionY(e.target.value)}
+                onChange={(e) => handleCropDimensionChange(e.target.value, "y")}
                 placeholder="px"
               />
             </div>
@@ -279,7 +447,7 @@ function App() {
                       <div className="relative w-full flex-1 flex items-center justify-center bg-black bg-opacity-10 min-h-[300px]">
                         <ReactCrop
                           crop={crop}
-                          onChange={(c) => setCrop(c)}
+                          onChange={onCropChange}
                           onComplete={handleCropComplete}
                           aspect={
                             aspectRatio === "free"
