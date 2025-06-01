@@ -85,42 +85,27 @@ function App() {
 
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const imageElement = e.currentTarget;
-    const {
-      naturalWidth,
-      naturalHeight,
-      width: displayWidth,
-      height: displayHeight,
-    } = imageElement;
+    const { naturalWidth, naturalHeight } = imageElement;
 
-    let initialAspect = 1 / 1;
-    if (aspectRatio !== "free") {
-      const parts = aspectRatio.split(":");
-      if (parts.length === 2) {
-        const num = parseFloat(parts[0]);
-        const den = parseFloat(parts[1]);
-        if (!isNaN(num) && !isNaN(den) && den !== 0) {
-          initialAspect = num / den;
+    if (!crop) {
+      let initialAspect = 1 / 1;
+      if (aspectRatio !== "free") {
+        const parts = aspectRatio.split(":");
+        if (parts.length === 2) {
+          const num = parseFloat(parts[0]);
+          const den = parseFloat(parts[1]);
+          if (!isNaN(num) && !isNaN(den) && den !== 0) {
+            initialAspect = num / den;
+          }
         }
       }
-    }
 
-    const newPercentCrop = centerAspectCrop(
-      naturalWidth,
-      naturalHeight,
-      initialAspect
-    );
-    setCrop(newPercentCrop);
-
-    if (displayWidth > 0 && displayHeight > 0) {
-      const initialDisplayPixelCrop = convertToPixelCrop(
-        newPercentCrop,
-        displayWidth,
-        displayHeight
+      const newPercentCrop = centerAspectCrop(
+        naturalWidth,
+        naturalHeight,
+        initialAspect
       );
-      setCompletedCrop(initialDisplayPixelCrop);
-    } else {
-      setCompletedCrop(undefined);
-      updateSidebarInputs(undefined);
+      setCrop(newPercentCrop);
     }
   };
 
@@ -324,23 +309,28 @@ function App() {
         height: displayHeight,
       } = imageElement;
 
+      const resetAspect = 1 / 1;
       const newPercentCrop = centerAspectCrop(
         naturalWidth,
         naturalHeight,
-        1 / 1
+        resetAspect
       );
       setCrop(newPercentCrop);
 
-      const displayEquivalentResetCrop = convertToPixelCrop(
-        newPercentCrop,
-        displayWidth,
-        displayHeight
-      );
-      setCompletedCrop(displayEquivalentResetCrop);
-      updateSidebarInputs(displayEquivalentResetCrop);
-      updateSidebarInputs(undefined);
+      if (displayWidth > 0 && displayHeight > 0) {
+        const displayEquivalentResetCrop = convertToPixelCrop(
+          newPercentCrop,
+          displayWidth,
+          displayHeight
+        );
+        setCompletedCrop(displayEquivalentResetCrop);
+        updateSidebarInputs(displayEquivalentResetCrop);
+      } else {
+        setCompletedCrop(undefined);
+        updateSidebarInputs(undefined);
+      }
     }
-    setAspectRatio("1:1");
+    setAspectRatio("free");
   };
 
   return (
