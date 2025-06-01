@@ -436,7 +436,7 @@ function App() {
                       onChange={onFileChange}
                     />
                     {imageSrc ? (
-                      <div className="relative w-full flex-1 flex items-center justify-center bg-black bg-opacity-10 min-h-[300px]">
+                      <div className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px]">
                         <ReactCrop
                           crop={crop}
                           onChange={onCropChange}
@@ -479,10 +479,8 @@ function App() {
                         </ReactCrop>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center bg-black bg-opacity-10 min-h-[200px] rounded-lg">
-                        <p className="text-muted-foreground">
-                          No image selected
-                        </p>
+                      <div className="flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[200px] rounded-lg">
+                        <p>No image selected</p>
                       </div>
                     )}
                     <Button
@@ -497,10 +495,10 @@ function App() {
                   <div className="flex flex-col gap-4">
                     {croppedImage ? (
                       <>
-                        <div className="relative w-full flex-1 flex items-center justify-center bg-black bg-opacity-10 min-h-[300px]">
+                        <div className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px] rounded-lg">
                           <img
                             src={croppedImage}
-                            className="max-h-full max-w-full object-contain"
+                            className="max-h-full max-w-full object-contain rounded-lg"
                             alt="Cropped preview"
                             style={{
                               maxHeight: "calc(100vh - 300px)",
