@@ -4,7 +4,11 @@
 
 ### TODO:
 
-- Whole image crop settings panel to the left, with crop controls in the center.
+~~- Whole image crop settings panel to the left, with crop controls in the center.~~
+
+- Crop Selection and Crop Position functionality
 - Multiple image format export options
-- Multiple aspect ratio options (including social media specific)
+
+~~- Multiple aspect ratio options~~ (including social media specific)
+
 - Cursor should switch to Hand when hovering over Generate Preview
