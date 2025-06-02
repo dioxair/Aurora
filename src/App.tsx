@@ -223,6 +223,31 @@ function App() {
     }
   };
 
+  const sanitizeNumericInput = (
+    inputValue: string
+  ): { valueForState: string; numericValue: number } => {
+    let valueForState = "";
+    let numericValue: number = NaN;
+
+    if (inputValue.trim() === "") {
+      valueForState = "";
+    } else if (inputValue.includes("-") || /[a-zA-Z]/.test(inputValue)) {
+      valueForState = "";
+    } else {
+      const potentialNumber = Number(inputValue);
+
+      if (!isNaN(potentialNumber) && potentialNumber >= 0) {
+        numericValue = potentialNumber;
+        valueForState = potentialNumber.toString();
+      } else {
+        valueForState = "";
+      }
+    }
+    console.log(valueForState);
+    console.log(numericValue);
+    return { valueForState, numericValue };
+  };
+
   const updateSidebarInputs = updateSidebarInputsCallback;
 
   const onCropChange = (
@@ -244,15 +269,18 @@ function App() {
     inputValue: string,
     dimension: "width" | "height" | "x" | "y"
   ) => {
-    if (dimension === "width") setCropWidth(inputValue);
-    else if (dimension === "height") setCropHeight(inputValue);
-    else if (dimension === "x") setPositionX(inputValue);
-    else if (dimension === "y") setPositionY(inputValue);
+    const {
+      valueForState: processedStringForState,
+      numericValue: numericValueForLogic,
+    } = sanitizeNumericInput(inputValue);
 
-    const naturalNumericValue = parseInt(inputValue, 10);
+    if (dimension === "width") setCropWidth(processedStringForState);
+    else if (dimension === "height") setCropHeight(processedStringForState);
+    else if (dimension === "x") setPositionX(processedStringForState);
+    else if (dimension === "y") setPositionY(processedStringForState);
 
     if (
-      !isNaN(naturalNumericValue) &&
+      !isNaN(numericValueForLogic) &&
       imgRef.current &&
       imgRef.current.width > 0 &&
       imgRef.current.height > 0 &&
@@ -280,16 +308,16 @@ function App() {
 
         if (dimension === "width")
           newDisplayPixelValues.width =
-            naturalNumericValue / displayToNaturalScaleX;
+            numericValueForLogic / displayToNaturalScaleX;
         else if (dimension === "height")
           newDisplayPixelValues.height =
-            naturalNumericValue / displayToNaturalScaleY;
+            numericValueForLogic / displayToNaturalScaleY;
         else if (dimension === "x")
           newDisplayPixelValues.x =
-            naturalNumericValue / displayToNaturalScaleX;
+            numericValueForLogic / displayToNaturalScaleX;
         else if (dimension === "y")
           newDisplayPixelValues.y =
-            naturalNumericValue / displayToNaturalScaleY;
+            numericValueForLogic / displayToNaturalScaleY;
 
         const updatedDisplayCrop = {
           ...currentDisplayPixelCrop,
@@ -336,6 +364,7 @@ function App() {
         return updatedDisplayCrop;
       });
     }
+    return null;
   };
 
   const generateCroppedPreview = useCallback(() => {
