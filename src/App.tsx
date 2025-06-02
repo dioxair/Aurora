@@ -1,5 +1,9 @@
 import "./App.css";
 import { useState, useCallback, useRef, useEffect } from "react";
+
+import { useTutorial, DUMMY_IMAGE_URL_FOR_CHECK } from "./useTutorial";
+import { TutorialOverlay } from "./TutorialOverlay";
+
 import ReactCrop, {
   type Crop,
   type PixelCrop,
@@ -69,9 +73,6 @@ function App() {
   const [positionX, setPositionX] = useState<string>("");
   const [positionY, setPositionY] = useState<string>("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const [showTutorial, setShowTutorial] = useState<boolean>(false);
-  const [tutorialStep, setTutorialStep] = useState<number>(0);
   const [isMobileView, setIsMobileView] = useState<boolean>(false);
 
   const fileInputContainerRef = useRef<HTMLDivElement>(null);
@@ -81,10 +82,65 @@ function App() {
   const previewTabTriggerRef = useRef<HTMLButtonElement>(null);
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
 
-  const DUMMY_IMAGE_URL = "https://picsum.photos/600/400";
-  const ANOTHER_DUMMY_IMAGE =
-    "https://files.samola.net/r/backup_sample_(image_by_ALPCMAS).jpg";
-  const DUMMY_FILE_NAME = "sample-image.jpg";
+  const updateSidebarInputsCallback = useCallback(
+    (displayPixelCrop: PixelCrop | undefined) => {
+      if (
+        displayPixelCrop &&
+        imgRef.current &&
+        imgRef.current.width > 0 &&
+        imgRef.current.height > 0
+      ) {
+        const imageElement = imgRef.current;
+        // scale factors :nauseated_face:
+        const scaleX = imageElement.naturalWidth / imageElement.width;
+        const scaleY = imageElement.naturalHeight / imageElement.height;
+
+        setCropWidth(String(Math.round(displayPixelCrop.width * scaleX)));
+        setCropHeight(String(Math.round(displayPixelCrop.height * scaleY)));
+        setPositionX(String(Math.round(displayPixelCrop.x * scaleX)));
+        setPositionY(String(Math.round(displayPixelCrop.y * scaleY)));
+      } else if (!displayPixelCrop) {
+        setCropWidth("");
+        setCropHeight("");
+        setPositionX("");
+        setPositionY("");
+      }
+    },
+    [imgRef]
+  );
+
+  const {
+    showTutorial,
+    tutorialStep,
+    setTutorialStep,
+    handleNextTutorialStep,
+    handleSkipTutorial,
+  } = useTutorial({
+    isMobileView,
+    isMobileMenuOpen,
+    setIsMobileMenuOpen,
+    imageSrc,
+    setImageSrc,
+    setFileType,
+    setOriginalFileName,
+    appCropState: crop,
+    setCrop,
+    appCompletedCropState: completedCrop,
+    setCompletedCrop,
+    setCroppedImage,
+    appTabValue: tabValue,
+    setTabValue,
+    imgRef,
+    aspectRatio,
+    updateSidebarInputs: updateSidebarInputsCallback,
+    triggerHandleCropImage: async () => handleCropImage(),
+    centerAspectCropFn: centerAspectCrop,
+    interactionRefs: {
+      hamburgerMenuRef,
+      generatePreviewButtonRef,
+      previewTabTriggerRef,
+    },
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -94,162 +150,8 @@ function App() {
 
     window.addEventListener("resize", handleResize);
     handleResize();
-
-    const tutorialCompleted = localStorage.getItem("auroraTutorialCompleted");
-    if (!tutorialCompleted) {
-      setShowTutorial(true);
-      setTutorialStep(0);
-    }
-
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  const loadDummyImageForTutorial = useCallback(() => {
-    if (!imageSrc || showTutorial) {
-      fetch(DUMMY_IMAGE_URL)
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          return response.blob();
-        })
-        .then((blob) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setImageSrc(reader.result as string);
-            setFileType("image/jpeg"); // Picsum usually serves jpeg
-            setOriginalFileName(DUMMY_FILE_NAME);
-            setCrop(undefined); // Crucial: Reset crop so onImageLoad can set a new one
-            setCompletedCrop(undefined);
-            setCroppedImage(null);
-            setTabValue("crop"); // Ensure user is on crop tab
-          };
-          reader.readAsDataURL(blob);
-        })
-        .catch((error) => {
-          console.error(
-            "Error fetching dummy image, falling back to a hardcoded one\nError:",
-            error
-          );
-
-          fetch(ANOTHER_DUMMY_IMAGE)
-            .then((response) => {
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              return response.blob();
-            })
-            .then((blob) => {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                setImageSrc(reader.result as string);
-                setFileType("image/jpeg");
-                setOriginalFileName(DUMMY_FILE_NAME);
-                setCrop(undefined);
-                setCompletedCrop(undefined);
-                setCroppedImage(null);
-                setTabValue("crop");
-              };
-              reader.readAsDataURL(blob);
-            });
-        });
-    }
-  }, [imageSrc, showTutorial]);
-
-  const handleNextTutorialStep = () => {
-    const currentStep = tutorialStep;
-    const mobile = isMobileView;
-    let nextStepState = -1;
-
-    if (currentStep === 0) {
-      nextStepState = mobile ? 1 : 2;
-    } else if (mobile && currentStep === 1) {
-      if (hamburgerMenuRef.current && !isMobileMenuOpen) {
-        hamburgerMenuRef.current.click();
-      }
-      nextStepState = 2;
-    } else if (currentStep === 2) {
-      if (!imageSrc) {
-        loadDummyImageForTutorial();
-      }
-      if (isMobileMenuOpen) setIsMobileMenuOpen(false);
-      nextStepState = 3;
-    } else if (currentStep === 3) {
-      if (
-        imageSrc === DUMMY_IMAGE_URL &&
-        !crop &&
-        imgRef.current &&
-        imgRef.current.naturalWidth > 0
-      ) {
-        const {
-          naturalWidth,
-          naturalHeight,
-          width: displayWidth,
-          height: displayHeight,
-        } = imgRef.current;
-        const aspectToUse =
-          aspectRatio === "free"
-            ? displayWidth / displayHeight
-            : parseFloat(aspectRatio.split(":")[0]) /
-              parseFloat(aspectRatio.split(":")[1]);
-        const initialCrop = centerAspectCrop(
-          naturalWidth,
-          naturalHeight,
-          aspectToUse || 1
-        );
-        setCrop(initialCrop);
-        const displayPixelCrop = convertToPixelCrop(
-          initialCrop,
-          displayWidth,
-          displayHeight
-        );
-        setCompletedCrop(displayPixelCrop);
-        updateSidebarInputs(displayPixelCrop);
-      }
-      nextStepState = 4;
-    } else if (currentStep === 4) {
-      if (
-        generatePreviewButtonRef.current &&
-        !generatePreviewButtonRef.current.disabled
-      ) {
-        generatePreviewButtonRef.current.click();
-      } else if (imageSrc && (completedCrop || crop)) {
-        // Fallback
-        handleCropImage();
-      }
-      nextStepState = 5;
-    } else if (currentStep === 5) {
-      if (previewTabTriggerRef.current && tabValue !== "preview") {
-        previewTabTriggerRef.current.click();
-      } else {
-        setTabValue("preview");
-      }
-      nextStepState = 6;
-    } else if (currentStep === 6) {
-      setShowTutorial(false);
-      localStorage.setItem("auroraTutorialCompleted", "true");
-      if (isMobileMenuOpen) setIsMobileMenuOpen(false);
-      return;
-    }
-
-    if (nextStepState !== -1) {
-      setTutorialStep(nextStepState);
-    }
-  };
-
-  const handleSkipTutorial = () => {
-    setShowTutorial(false);
-    localStorage.setItem("auroraTutorialCompleted", "true");
-    if (isMobileMenuOpen) setIsMobileMenuOpen(false);
-    if (imageSrc === DUMMY_IMAGE_URL) {
-      // Reset if dummy was loaded
-      setImageSrc(null);
-      setOriginalFileName(null);
-      setCrop(undefined);
-      setCompletedCrop(undefined);
-      setCroppedImage(null);
-    }
-  };
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -281,11 +183,11 @@ function App() {
       height: displayHeight,
     } = imageElement;
 
-    if (!crop || (imageSrc === DUMMY_IMAGE_URL && showTutorial)) {
+    if (!crop || (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial)) {
       let initialAspect = 1 / 1;
       if (
         aspectRatio !== "free" &&
-        !(imageSrc === DUMMY_IMAGE_URL && showTutorial)
+        !(imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial)
       ) {
         const parts = aspectRatio.split(":");
         if (parts.length === 2) {
@@ -305,7 +207,10 @@ function App() {
         initialAspect || 1
       );
       setCrop(newPercentCrop);
-      if ((imageSrc === DUMMY_IMAGE_URL && showTutorial) || !completedCrop) {
+      if (
+        (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial) ||
+        !completedCrop
+      ) {
         const displayPixelCropVal = convertToPixelCrop(
           newPercentCrop,
           displayWidth,
@@ -317,29 +222,7 @@ function App() {
     }
   };
 
-  const updateSidebarInputs = (displayPixelCrop: PixelCrop | undefined) => {
-    if (
-      displayPixelCrop &&
-      imgRef.current &&
-      imgRef.current.width > 0 &&
-      imgRef.current.height > 0
-    ) {
-      const imageElement = imgRef.current;
-      // scale factors :nauseated_face:
-      const scaleX = imageElement.naturalWidth / imageElement.width;
-      const scaleY = imageElement.naturalHeight / imageElement.height;
-
-      setCropWidth(String(Math.round(displayPixelCrop.width * scaleX)));
-      setCropHeight(String(Math.round(displayPixelCrop.height * scaleY)));
-      setPositionX(String(Math.round(displayPixelCrop.x * scaleX)));
-      setPositionY(String(Math.round(displayPixelCrop.y * scaleY)));
-    } else if (!displayPixelCrop) {
-      setCropWidth("");
-      setCropHeight("");
-      setPositionX("");
-      setPositionY("");
-    }
-  };
+  const updateSidebarInputs = updateSidebarInputsCallback;
 
   const onCropChange = (
     displayPixelCrop: PixelCrop /*, percentCrop: Crop*/
@@ -348,10 +231,13 @@ function App() {
     updateSidebarInputs(displayPixelCrop);
   };
 
-  const handleCropComplete = useCallback((displayPixelCrop: PixelCrop) => {
-    setCompletedCrop(displayPixelCrop);
-    updateSidebarInputs(displayPixelCrop);
-  }, []);
+  const handleCropComplete = useCallback(
+    (displayPixelCrop: PixelCrop) => {
+      setCompletedCrop(displayPixelCrop);
+      updateSidebarInputs(displayPixelCrop);
+    },
+    [updateSidebarInputs]
+  );
 
   const handleCropDimensionChange = (
     inputValue: string,
@@ -506,6 +392,8 @@ function App() {
     generateCroppedPreview,
     showTutorial,
     tutorialStep,
+    setTutorialStep,
+    setTabValue,
   ]);
 
   const getDownloadFileName = () => {
@@ -574,7 +462,6 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <div className="flex md:flex-row h-screen bg-background overflow-hidden">
-        {/* Sidebar */}
         <div
           className={`
             fixed inset-y-0 left-0 z-40 w-3/4 sm:w-64 
@@ -703,7 +590,6 @@ function App() {
           </div>
         </div>
 
-        {/* Overlay for mobile hamburger menu */}
         {isMobileMenuOpen && (
           <div
             className="fixed inset-0 z-30 bg-black/50 md:hidden"
@@ -711,7 +597,6 @@ function App() {
           />
         )}
 
-        {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-y-auto md:justify-center md:h-auto">
           <div className="p-2 md:hidden sticky top-0 bg-background z-20 flex items-center">
             <Button
@@ -720,7 +605,9 @@ function App() {
               size="icon"
               onClick={() => {
                 setIsMobileMenuOpen(!isMobileMenuOpen);
-                if (showTutorial) handleNextTutorialStep();
+                if (showTutorial && tutorialStep === 1 && isMobileView) {
+                  handleNextTutorialStep();
+                }
               }}
             >
               <MenuIcon className="h-6 w-6" />
@@ -897,298 +784,5 @@ function App() {
     </ThemeProvider>
   );
 }
-interface TutorialOverlayProps {
-  step: number;
-  isMobile: boolean;
-  targetRefs: {
-    fileInput?: React.RefObject<HTMLDivElement | null>;
-    hamburgerMenu?: React.RefObject<HTMLButtonElement | null>;
-    cropArea?: React.RefObject<HTMLDivElement | null>;
-    generatePreviewButton?: React.RefObject<HTMLButtonElement | null>;
-    previewTabTrigger?: React.RefObject<HTMLButtonElement | null>;
-    downloadLink?: React.RefObject<HTMLAnchorElement | null>;
-  };
-  onNext: () => void;
-  onSkip: () => void;
-  isMobileMenuOpen?: boolean;
-}
-
-const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
-  step,
-  isMobile,
-  targetRefs,
-  onNext,
-  onSkip,
-  isMobileMenuOpen,
-}) => {
-  const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties>({});
-  const [textStyle, setTextStyle] = useState<React.CSSProperties>({});
-  const [content, setContent] = useState<{
-    title: string;
-    text: string;
-    button: string;
-  }>({ title: "", text: "", button: "Next" });
-
-  useEffect(() => {
-    let tempContentDetails = { title: "", text: "", button: "Next" };
-
-    if (step === 0) {
-      tempContentDetails = {
-        title: "Welcome to Aurora!",
-        text: "This quick tour will show you around.",
-        button: "Start Tour",
-      };
-    } else {
-      if (isMobile && step === 1) {
-        tempContentDetails = {
-          title: "Navigation",
-          text: "Tap here to open controls.",
-          button: "Next",
-        };
-      } else if (step === 2) {
-        tempContentDetails = {
-          title: "Select Image",
-          text: "Choose an image. Or, click Next for a sample.",
-          button: "Next",
-        };
-      } else if (step === 3) {
-        tempContentDetails = {
-          title: "Crop Your Image",
-          text: "Adjust the crop here or use sidebar controls.",
-          button: "Next",
-        };
-      } else if (step === 4) {
-        tempContentDetails = {
-          title: "Preview Crop",
-          text: "Happy with the selection? Click to generate a preview.",
-          button: "Next",
-        };
-      } else if (step === 5) {
-        tempContentDetails = {
-          title: "View Preview",
-          text: "In this tab, you can view your crop, and if you're happy with it, download the resulting image.",
-          button: "Next",
-        };
-      } else if (step === 6) {
-        tempContentDetails = {
-          title: "Download",
-          text: "Click here to download your image.",
-          button: "Got it!",
-        };
-      }
-    }
-
-    setContent(tempContentDetails);
-
-    const calculateAndSetVisualStyles = () => {
-      let localCurrentTargetRef:
-        | React.RefObject<HTMLElement | null>
-        | undefined;
-      if (isMobile && step === 1) {
-        localCurrentTargetRef = targetRefs.hamburgerMenu;
-      } else if (step === 2) {
-        localCurrentTargetRef = targetRefs.fileInput;
-      } else if (step === 3) {
-        localCurrentTargetRef = targetRefs.cropArea;
-      } else if (step === 4) {
-        localCurrentTargetRef = targetRefs.generatePreviewButton;
-      } else if (step === 5) {
-        localCurrentTargetRef = targetRefs.previewTabTrigger;
-      } else if (step === 6) {
-        localCurrentTargetRef = targetRefs.downloadLink;
-      }
-
-      if (step === 0) {
-        setHighlightStyle({
-          position: "fixed",
-          top: "0px",
-          left: "0px",
-          width: "100vw",
-          height: "100vh",
-          background: "rgba(0,0,0,0.65)",
-          zIndex: 10000,
-          pointerEvents: "auto",
-          transition: "all 0.3s ease-in-out",
-          border: "none",
-          boxShadow: "none",
-        });
-        setTextStyle({
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          padding: "20px",
-          background: "var(--card)",
-          color: "var(--card-foreground)",
-          borderRadius: "8px",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
-          zIndex: 10001,
-          textAlign: "center",
-          border: "1px solid var(--border)",
-          minWidth: "280px",
-        });
-      } else if (localCurrentTargetRef?.current) {
-        const rect = localCurrentTargetRef.current.getBoundingClientRect(); //
-
-        if (
-          rect.width === 0 &&
-          rect.height === 0 &&
-          rect.x === 0 &&
-          rect.y === 0 &&
-          step > 0
-        ) {
-          setHighlightStyle({
-            position: "fixed",
-            top: "0px",
-            left: "0px",
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(0,0,0,0.65)",
-            zIndex: 10000,
-            pointerEvents: "none",
-            transition: "all 0.3s ease-in-out",
-            border: "none",
-            boxShadow: "none",
-          });
-          setTextStyle({ display: "none" });
-          return;
-        }
-
-        const padding = 5;
-        const newHighlightStyleVal: React.CSSProperties = {
-          position: "fixed",
-          top: `${rect.top - padding}px`,
-          left: `${rect.left - padding}px`,
-          width: `${rect.width + padding * 2}px`,
-          height: `${rect.height + padding * 2}px`,
-          border: "3px solid var(--primary)",
-          borderRadius: "8px",
-          boxShadow: `0 0 0 9999px rgba(0,0,0,0.65)`,
-          background: "transparent",
-          pointerEvents: "none",
-          transition: "all 0.3s ease-in-out",
-          zIndex: 10000,
-        };
-
-        const textTop = rect.bottom + padding * 2 + 10;
-        const textLeft = rect.left + rect.width / 2;
-        const newTextStyleVal: React.CSSProperties = {
-          position: "fixed",
-          padding: "15px",
-          background: "var(--card)",
-          color: "var(--card-foreground)",
-          borderRadius: "8px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-          zIndex: 10001,
-          minWidth: "250px",
-          maxWidth: "320px",
-          border: "1px solid var(--border)",
-          transition: "opacity 0.3s ease-in-out, transform 0.3s ease-in-out",
-          top: `${textTop}px`,
-          left: `${textLeft}px`,
-          transform: "translateX(-50%)",
-        };
-
-        const approxTextboxHeight = 120;
-        if (textTop + approxTextboxHeight > window.innerHeight) {
-          newTextStyleVal.top = `${rect.top - padding * 2 - 10}px`;
-          newTextStyleVal.transform = "translateX(-50%) translateY(-100%)";
-        }
-        if (rect.left + rect.width / 2 < 160) {
-          newTextStyleVal.left = `${Math.max(padding, rect.left)}px`;
-          newTextStyleVal.transform = "translateX(0)";
-        } else if (window.innerWidth - (rect.left + rect.width / 2) < 160) {
-          newTextStyleVal.left = `${Math.min(
-            window.innerWidth - padding,
-            rect.right
-          )}px`;
-          newTextStyleVal.transform = "translateX(-100%)";
-        }
-
-        setHighlightStyle(newHighlightStyleVal);
-        setTextStyle(newTextStyleVal);
-      } else if (step > 0) {
-        setHighlightStyle({
-          position: "fixed",
-          top: "0px",
-          left: "0px",
-          width: "100vw",
-          height: "100vh",
-          background: "rgba(0,0,0,0.65)",
-          zIndex: 10000,
-          pointerEvents: "none",
-          transition: "all 0.3s ease-in-out",
-          border: "none",
-          boxShadow: "none",
-        });
-        setTextStyle({ display: "none" });
-      }
-    };
-
-    // some hacky delay shit to hope and pray that the highlight works correctly,  similar to basically everything above
-    let delay = 0;
-    if (step === 5) {
-      delay = 150;
-    } else if (isMobile && step === 2) {
-      delay = 350;
-    }
-
-    if (delay > 0) {
-      const timerId = setTimeout(calculateAndSetVisualStyles, delay);
-      return () => clearTimeout(timerId);
-    } else {
-      calculateAndSetVisualStyles();
-    }
-  }, [step, isMobile, targetRefs, isMobileMenuOpen]);
-
-  if (!content.title && step !== 0) return null;
-
-  return (
-    <>
-      <div style={highlightStyle} />{" "}
-      <div style={textStyle}>
-        <h4
-          style={{
-            marginTop: 0,
-            marginBottom: "10px",
-            fontSize: "1.2em",
-            fontWeight: 600,
-            color: "var(--foreground)",
-          }}
-        >
-          {content.title}
-        </h4>
-        <p
-          style={{
-            margin: "0 0 15px 0",
-            fontSize: "0.95em",
-            color: "var(--muted-foreground)",
-          }}
-        >
-          {content.text}
-        </p>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          {step !== 0 && (
-            <Button
-              variant="ghost"
-              onClick={onSkip}
-              style={{ paddingLeft: 0, color: "var(--muted-foreground)" }}
-            >
-              Skip Tutorial
-            </Button>
-          )}
-          {step === 0 && <div style={{ flex: 1 }}></div>}{" "}
-          <Button onClick={onNext}>{content.button}</Button>
-        </div>
-      </div>
-    </>
-  );
-};
 
 export default App;
