@@ -466,6 +466,10 @@ function App() {
     setTutorialStep(0);
   };
 
+  const handleGitHubRepoVisit = () => {
+    window.open("https://github.com/dioxair/Aurora");
+  };
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <div className="flex md:flex-row h-screen bg-background overflow-hidden">
@@ -605,6 +609,14 @@ function App() {
               onClick={handleRestartTutorial}
             >
               Restart tutorial
+            </Button>
+
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={handleGitHubRepoVisit}
+            >
+              See GitHub repository
             </Button>
           </div>
         </div>
