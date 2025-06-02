@@ -111,6 +111,7 @@ function App() {
 
   const {
     showTutorial,
+    setShowTutorial,
     tutorialStep,
     setTutorialStep,
     handleNextTutorialStep,
@@ -459,6 +460,12 @@ function App() {
     setAspectRatio("free");
   };
 
+  const handleRestartTutorial = () => {
+    localStorage.removeItem("auroraTutorialCompleted");
+    setShowTutorial(true);
+    setTutorialStep(0);
+  };
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <div className="flex md:flex-row h-screen bg-background overflow-hidden">
@@ -587,6 +594,18 @@ function App() {
                 placeholder="px"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-white font-medium">Misc.</h3>
+
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={handleRestartTutorial}
+            >
+              Restart tutorial
+            </Button>
           </div>
         </div>
 
