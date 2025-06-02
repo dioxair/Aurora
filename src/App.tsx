@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Menu as MenuIcon } from "lucide-react";
+import { Menu as MenuIcon, Plus, Minus, RefreshCw } from "lucide-react";
 
 function centerAspectCrop(
   mediaWidth: number,
@@ -75,12 +75,25 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileView, setIsMobileView] = useState<boolean>(false);
 
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+
   const fileInputContainerRef = useRef<HTMLDivElement>(null);
   const hamburgerMenuRef = useRef<HTMLButtonElement>(null);
   const cropAreaRef = useRef<HTMLDivElement>(null);
   const generatePreviewButtonRef = useRef<HTMLButtonElement>(null);
   const previewTabTriggerRef = useRef<HTMLButtonElement>(null);
   const downloadLinkRef = useRef<HTMLAnchorElement>(null);
+
+  const initialZoomAtPinchStartRef = useRef<number>(1);
+  const initialPanAtPinchStartRef = useRef<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+  const initialPinchDistanceRef = useRef<number | null>(null);
+  const initialPinchMidpointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const ZOOM_STEP = 0.2;
 
   const updateSidebarInputsCallback = useCallback(
     (displayPixelCrop: PixelCrop | undefined) => {
@@ -95,10 +108,21 @@ function App() {
         const scaleX = imageElement.naturalWidth / imageElement.width;
         const scaleY = imageElement.naturalHeight / imageElement.height;
 
-        setCropWidth(String(Math.round(displayPixelCrop.width * scaleX)));
-        setCropHeight(String(Math.round(displayPixelCrop.height * scaleY)));
-        setPositionX(String(Math.round(displayPixelCrop.x * scaleX)));
-        setPositionY(String(Math.round(displayPixelCrop.y * scaleY)));
+        const cropXOnImageContentScaled = displayPixelCrop.x - pan.x;
+        const cropYOnImageContentScaled = displayPixelCrop.y - pan.y;
+
+        setCropWidth(
+          String(Math.round((displayPixelCrop.width / zoom) * scaleX))
+        );
+        setCropHeight(
+          String(Math.round((displayPixelCrop.height / zoom) * scaleY))
+        );
+        setPositionX(
+          String(Math.round((cropXOnImageContentScaled / zoom) * scaleX))
+        );
+        setPositionY(
+          String(Math.round((cropYOnImageContentScaled / zoom) * scaleY))
+        );
       } else if (!displayPixelCrop) {
         setCropWidth("");
         setCropHeight("");
@@ -106,7 +130,7 @@ function App() {
         setPositionY("");
       }
     },
-    [imgRef]
+    [imgRef, zoom, pan]
   );
 
   const {
@@ -154,6 +178,13 @@ function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    if (imageSrc) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [imageSrc]);
+
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -166,6 +197,8 @@ function App() {
         setCompletedCrop(undefined);
         setCroppedImage(null);
         setTabValue("crop");
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
         if (showTutorial && tutorialStep === 2) {
           if (isMobileMenuOpen) setIsMobileMenuOpen(false);
           setTutorialStep(3);
@@ -180,11 +213,25 @@ function App() {
     const {
       naturalWidth,
       naturalHeight,
-      width: displayWidth,
-      height: displayHeight,
+      width: layoutWidth,
+      height: layoutHeight,
     } = imageElement;
 
-    if (!crop || (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial)) {
+    const cropIsEffectivelyEmpty =
+      !crop || (crop.width === 0 && crop.height === 0);
+
+    if (
+      cropIsEffectivelyEmpty ||
+      (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial)
+    ) {
+      let currentPanToUse = pan;
+      let currentZoomToUse = zoom;
+
+      if (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial) {
+        currentPanToUse = { x: 0, y: 0 };
+        currentZoomToUse = 1;
+      }
+
       let initialAspect = 1 / 1;
       if (
         aspectRatio !== "free" &&
@@ -207,18 +254,32 @@ function App() {
         naturalHeight,
         initialAspect || 1
       );
-      setCrop(newPercentCrop);
+
+      const pixelCropTargetWidth = layoutWidth * currentZoomToUse;
+      const pixelCropTargetHeight = layoutHeight * currentZoomToUse;
+
+      const contentRelativeInitialPixelCrop = convertToPixelCrop(
+        newPercentCrop,
+        pixelCropTargetWidth,
+        pixelCropTargetHeight
+      );
+
+      const viewportRelativeInitialCrop = {
+        ...contentRelativeInitialPixelCrop,
+        x: contentRelativeInitialPixelCrop.x + currentPanToUse.x,
+        y: contentRelativeInitialPixelCrop.y + currentPanToUse.y,
+      };
+      setCrop(viewportRelativeInitialCrop);
+
+      const completedCropIsEffectivelyEmpty =
+        !completedCrop ||
+        (completedCrop.width === 0 && completedCrop.height === 0);
       if (
-        (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial) ||
-        !completedCrop
+        completedCropIsEffectivelyEmpty ||
+        (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial)
       ) {
-        const displayPixelCropVal = convertToPixelCrop(
-          newPercentCrop,
-          displayWidth,
-          displayHeight
-        );
-        setCompletedCrop(displayPixelCropVal);
-        updateSidebarInputs(displayPixelCropVal);
+        setCompletedCrop(viewportRelativeInitialCrop);
+        updateSidebarInputs(viewportRelativeInitialCrop);
       }
     }
   };
@@ -284,58 +345,89 @@ function App() {
       imgRef.current &&
       imgRef.current.width > 0 &&
       imgRef.current.height > 0 &&
-      crop // crop is the current crop for the display image
+      crop
     ) {
       const imageElement = imgRef.current;
-      const displayToNaturalScaleX =
+      const layoutToNaturalScaleX =
         imageElement.naturalWidth / imageElement.width;
-      const displayToNaturalScaleY =
+      const layoutToNaturalScaleY =
         imageElement.naturalHeight / imageElement.height;
 
       setCrop((prevDisplayCrop) => {
         if (!prevDisplayCrop) return prevDisplayCrop;
 
-        const currentDisplayPixelCrop =
+        const newScaledVisualDimValue = (value: number, scaleFactor: number) =>
+          (value / scaleFactor) * zoom;
+        const newScaledVisualPosValue = (
+          value: number,
+          scaleFactor: number,
+          panOffset: number
+        ) => (value / scaleFactor) * zoom + panOffset;
+
+        const currentContentRelativeCrop =
           prevDisplayCrop.unit === "%"
             ? convertToPixelCrop(
                 prevDisplayCrop,
-                imageElement.width,
-                imageElement.height
+                imageElement.width * zoom,
+                imageElement.height * zoom
               )
-            : (prevDisplayCrop as PixelCrop);
+            : {
+                ...prevDisplayCrop,
+                x: prevDisplayCrop.x - pan.x,
+                y: prevDisplayCrop.y - pan.y,
+              };
+
+        const viewportRelativeCurrentDisplayCrop = {
+          ...currentContentRelativeCrop,
+          x: currentContentRelativeCrop.x + pan.x,
+          y: currentContentRelativeCrop.y + pan.y,
+          unit: "px" as "px", // dumb linter error ignore, just trying to make sure its px
+          width: currentContentRelativeCrop.width,
+          height: currentContentRelativeCrop.height,
+        };
 
         const newDisplayPixelValues: Partial<PixelCrop> = { unit: "px" };
 
         if (dimension === "width")
-          newDisplayPixelValues.width =
-            numericValueForLogic / displayToNaturalScaleX;
+          newDisplayPixelValues.width = newScaledVisualDimValue(
+            numericValueForLogic,
+            layoutToNaturalScaleX
+          );
         else if (dimension === "height")
-          newDisplayPixelValues.height =
-            numericValueForLogic / displayToNaturalScaleY;
+          newDisplayPixelValues.height = newScaledVisualDimValue(
+            numericValueForLogic,
+            layoutToNaturalScaleY
+          );
         else if (dimension === "x")
-          newDisplayPixelValues.x =
-            numericValueForLogic / displayToNaturalScaleX;
+          newDisplayPixelValues.x = newScaledVisualPosValue(
+            numericValueForLogic,
+            layoutToNaturalScaleX,
+            pan.x
+          );
         else if (dimension === "y")
-          newDisplayPixelValues.y =
-            numericValueForLogic / displayToNaturalScaleY;
+          newDisplayPixelValues.y = newScaledVisualPosValue(
+            numericValueForLogic,
+            layoutToNaturalScaleY,
+            pan.y
+          );
 
         const updatedDisplayCrop = {
-          ...currentDisplayPixelCrop,
+          ...viewportRelativeCurrentDisplayCrop,
           ...newDisplayPixelValues,
         } as PixelCrop;
 
         // here comes a bunch of shit to clamp width and height to the actual image, so fun!!!
-        const displayWidth = imageElement.width;
-        const displayHeight = imageElement.height;
+        const scaledLayoutWidth = imageElement.width * zoom;
+        const scaledLayoutHeight = imageElement.height * zoom;
 
-        updatedDisplayCrop.x = Math.max(0, updatedDisplayCrop.x);
-        updatedDisplayCrop.y = Math.max(0, updatedDisplayCrop.y);
+        updatedDisplayCrop.x = Math.max(pan.x, updatedDisplayCrop.x);
+        updatedDisplayCrop.y = Math.max(pan.y, updatedDisplayCrop.y);
 
         if (dimension === "width" || dimension === "x") {
           updatedDisplayCrop.width = Math.max(1, updatedDisplayCrop.width || 0);
           updatedDisplayCrop.width = Math.min(
             updatedDisplayCrop.width,
-            displayWidth - updatedDisplayCrop.x
+            scaledLayoutWidth + pan.x - updatedDisplayCrop.x
           );
         }
         if (dimension === "height" || dimension === "y") {
@@ -345,18 +437,19 @@ function App() {
           );
           updatedDisplayCrop.height = Math.min(
             updatedDisplayCrop.height,
-            displayHeight - updatedDisplayCrop.y
+            scaledLayoutHeight + pan.y - updatedDisplayCrop.y
           );
         }
 
         updatedDisplayCrop.x = Math.min(
           updatedDisplayCrop.x,
-          displayWidth - (updatedDisplayCrop.width || 0)
+          scaledLayoutWidth + pan.x - (updatedDisplayCrop.width || 0)
         );
         updatedDisplayCrop.y = Math.min(
           updatedDisplayCrop.y,
-          displayHeight - (updatedDisplayCrop.height || 0)
+          scaledLayoutHeight + pan.y - (updatedDisplayCrop.height || 0)
         );
+
         if (updatedDisplayCrop.width < 1) updatedDisplayCrop.width = 1;
         if (updatedDisplayCrop.height < 1) updatedDisplayCrop.height = 1;
 
@@ -383,31 +476,55 @@ function App() {
 
     if (!ctx) return;
 
-    const scaleX = image.naturalWidth / image.width;
-    const scaleY = image.naturalHeight / image.height;
+    const imageContentXOnScaledImage = completedCrop.x - pan.x;
+    const imageContentYOnScaledImage = completedCrop.y - pan.y;
+    const imageContentWidthOnScaledImage = completedCrop.width;
+    const imageContentHeightOnScaledImage = completedCrop.height;
+
+    const unscaledCropX = imageContentXOnScaledImage / zoom;
+    const unscaledCropY = imageContentYOnScaledImage / zoom;
+    const unscaledCropWidth = imageContentWidthOnScaledImage / zoom;
+    const unscaledCropHeight = imageContentHeightOnScaledImage / zoom;
+
+    const layoutToNaturalScaleX = image.naturalWidth / image.width;
+    const layoutToNaturalScaleY = image.naturalHeight / image.height;
 
     // using natural dimensions for good quality crop result
-    const cropWidthValue = completedCrop.width * scaleX;
-    const cropHeightValue = completedCrop.height * scaleY;
+    const naturalCropX = unscaledCropX * layoutToNaturalScaleX;
+    const naturalCropY = unscaledCropY * layoutToNaturalScaleY;
+    const naturalCropWidth = unscaledCropWidth * layoutToNaturalScaleX;
+    const naturalCropHeight = unscaledCropHeight * layoutToNaturalScaleY;
 
-    canvas.width = Math.max(1, cropWidthValue);
-    canvas.height = Math.max(1, cropHeightValue);
+    canvas.width = Math.max(1, naturalCropWidth);
+    canvas.height = Math.max(1, naturalCropHeight);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     ctx.drawImage(
       image,
       // scaleX and scaleY means drawing the cropped area at original resolution
-      completedCrop.x * scaleX,
-      completedCrop.y * scaleY,
-      cropWidthValue,
-      cropHeightValue,
+      naturalCropX,
+      naturalCropY,
+      naturalCropWidth,
+      naturalCropHeight,
       0,
       0,
-      cropWidthValue,
-      cropHeightValue
+      naturalCropWidth,
+      naturalCropHeight
     );
 
     setCroppedImage(canvas.toDataURL(fileType));
-  }, [imageSrc, completedCrop, fileType]);
+  }, [
+    imageSrc,
+    completedCrop,
+    fileType,
+    zoom,
+    pan,
+    imgRef,
+    previewCanvasRef,
+    setCroppedImage,
+  ]);
 
   const handleCropImage = useCallback(async () => {
     if (!imageSrc || !completedCrop || !imgRef.current) return;
@@ -450,9 +567,14 @@ function App() {
       const {
         naturalWidth,
         naturalHeight,
-        width: displayWidth,
-        height: displayHeight,
+        width: layoutWidth,
+        height: layoutHeight,
       } = imageElement;
+
+      const newZoom = 1;
+      const newPan = { x: 0, y: 0 };
+      setZoom(newZoom);
+      setPan(newPan);
 
       const resetAspect =
         aspectRatio === "free"
@@ -466,28 +588,32 @@ function App() {
         resetAspect
       );
 
-      const displayPixelCropForCropState = convertToPixelCrop(
-        newPercentCrop,
-        displayWidth,
-        displayHeight
-      );
-      setCrop(displayPixelCropForCropState);
+      const pixelCropTargetWidth = layoutWidth * newZoom;
+      const pixelCropTargetHeight = layoutHeight * newZoom;
 
-      if (displayWidth > 0 && displayHeight > 0) {
-        const displayEquivalentResetCrop = convertToPixelCrop(
-          newPercentCrop,
-          displayWidth,
-          displayHeight
-        );
-        setCompletedCrop(displayEquivalentResetCrop);
-        updateSidebarInputs(displayEquivalentResetCrop);
-      } else {
-        setCompletedCrop(undefined);
-        updateSidebarInputs(undefined);
-      }
+      const contentRelativePixelCrop = convertToPixelCrop(
+        newPercentCrop,
+        pixelCropTargetWidth,
+        pixelCropTargetHeight
+      );
+
+      const viewportRelativePixelCrop = {
+        ...contentRelativePixelCrop,
+        x: contentRelativePixelCrop.x + newPan.x,
+        y: contentRelativePixelCrop.y + newPan.y,
+      };
+
+      setCrop(viewportRelativePixelCrop);
+      setCompletedCrop(viewportRelativePixelCrop);
+      updateSidebarInputs(viewportRelativePixelCrop);
     }
     setAspectRatio("free");
   };
+
+  const handleResetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [setZoom, setPan]);
 
   const handleRestartTutorial = () => {
     localStorage.removeItem("auroraTutorialCompleted");
@@ -498,6 +624,168 @@ function App() {
   const handleGitHubRepoVisit = () => {
     window.open("https://github.com/dioxair/Aurora");
   };
+
+  const handleManualZoom = useCallback(
+    (newZoomLevel: number) => {
+      if (!cropAreaRef.current || !imgRef.current) return;
+
+      const oldZoom = zoom;
+      const newZoomCandidate = Math.max(0.1, Math.min(newZoomLevel, 10));
+
+      if (newZoomCandidate === oldZoom) return;
+
+      const rect = cropAreaRef.current.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const newPanX =
+        centerX - ((centerX - pan.x) / oldZoom) * newZoomCandidate;
+      const newPanY =
+        centerY - ((centerY - pan.y) / oldZoom) * newZoomCandidate;
+
+      setZoom(newZoomCandidate);
+      setPan({ x: newPanX, y: newPanY });
+    },
+    [zoom, pan, setZoom, setPan, cropAreaRef, imgRef]
+  );
+
+  const zoomIn = useCallback(() => {
+    handleManualZoom(zoom + ZOOM_STEP);
+  }, [handleManualZoom, zoom]);
+
+  const zoomOut = useCallback(() => {
+    handleManualZoom(zoom - ZOOM_STEP);
+  }, [handleManualZoom, zoom]);
+
+  const handleWheel = useCallback(
+    (event: React.WheelEvent) => {
+      if (!imgRef.current || !cropAreaRef.current) return;
+      event.preventDefault();
+
+      const rect = cropAreaRef.current.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      const zoomFactor = 0.1;
+      const delta = event.deltaY > 0 ? -1 : 1;
+      const newZoomLevel = zoom * (1 + delta * zoomFactor);
+
+      const oldZoom = zoom;
+      const newZoomClamped = Math.max(0.1, Math.min(newZoomLevel, 10));
+
+      if (newZoomClamped === oldZoom) return;
+
+      const newPanX = mouseX - ((mouseX - pan.x) / oldZoom) * newZoomClamped;
+      const newPanY = mouseY - ((mouseY - pan.y) / oldZoom) * newZoomClamped;
+
+      setZoom(newZoomClamped);
+      setPan({ x: newPanX, y: newPanY });
+    },
+    [zoom, pan, setZoom, setPan]
+  );
+
+  const handlePinchStart = useCallback(
+    (event: React.TouchEvent) => {
+      if (event.touches.length === 2 && cropAreaRef.current) {
+        event.preventDefault();
+        const t1 = event.touches[0];
+        const t2 = event.touches[1];
+
+        initialPinchDistanceRef.current = Math.sqrt(
+          Math.pow(t1.clientX - t2.clientX, 2) +
+            Math.pow(t1.clientY - t2.clientY, 2)
+        );
+        initialZoomAtPinchStartRef.current = zoom;
+        initialPanAtPinchStartRef.current = pan;
+
+        const rect = cropAreaRef.current.getBoundingClientRect();
+        initialPinchMidpointRef.current = {
+          x: (t1.clientX + t2.clientX) / 2 - rect.left,
+          y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        };
+      }
+    },
+    [zoom, pan]
+  );
+
+  const handlePinchMove = useCallback(
+    (event: React.TouchEvent) => {
+      if (
+        event.touches.length === 2 &&
+        initialPinchDistanceRef.current !== null &&
+        initialPinchMidpointRef.current &&
+        cropAreaRef.current
+      ) {
+        event.preventDefault();
+        const t1 = event.touches[0];
+        const t2 = event.touches[1];
+
+        const currentDist = Math.sqrt(
+          Math.pow(t1.clientX - t2.clientX, 2) +
+            Math.pow(t1.clientY - t2.clientY, 2)
+        );
+        const scaleChange = currentDist / initialPinchDistanceRef.current;
+        const newZoomCandidate =
+          initialZoomAtPinchStartRef.current * scaleChange;
+
+        const oldZoomForPanCalc = initialZoomAtPinchStartRef.current;
+        const newZoomClamped = Math.max(0.1, Math.min(newZoomCandidate, 10));
+
+        if (
+          newZoomClamped === oldZoomForPanCalc &&
+          event.touches.length === 2
+        ) {
+          const rect = cropAreaRef.current.getBoundingClientRect();
+          const currentMidpoint = {
+            x: (t1.clientX + t2.clientX) / 2 - rect.left,
+            y: (t1.clientY + t2.clientY) / 2 - rect.top,
+          };
+          const dragX = currentMidpoint.x - initialPinchMidpointRef.current.x;
+          const dragY = currentMidpoint.y - initialPinchMidpointRef.current.y;
+          setPan({
+            x: initialPanAtPinchStartRef.current.x + dragX,
+            y: initialPanAtPinchStartRef.current.y + dragY,
+          });
+          return;
+        }
+        if (newZoomClamped === zoom) return;
+
+        const initialMidpoint = initialPinchMidpointRef.current;
+        const initialPanVal = initialPanAtPinchStartRef.current;
+
+        let newPanX =
+          initialMidpoint.x -
+          ((initialMidpoint.x - initialPanVal.x) / oldZoomForPanCalc) *
+            newZoomClamped;
+        let newPanY =
+          initialMidpoint.y -
+          ((initialMidpoint.y - initialPanVal.y) / oldZoomForPanCalc) *
+            newZoomClamped;
+
+        const rect = cropAreaRef.current.getBoundingClientRect();
+        const currentMidpoint = {
+          x: (t1.clientX + t2.clientX) / 2 - rect.left,
+          y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        };
+        const dragX = currentMidpoint.x - initialMidpoint.x;
+        const dragY = currentMidpoint.y - initialMidpoint.y;
+
+        newPanX += dragX;
+        newPanY += dragY;
+
+        setZoom(newZoomClamped);
+        setPan({ x: newPanX, y: newPanY });
+      }
+    },
+    [zoom, pan, setZoom, setPan]
+  );
+
+  const handlePinchEnd = useCallback((event: React.TouchEvent) => {
+    if (event.touches.length < 2) {
+      initialPinchDistanceRef.current = null;
+      initialPinchMidpointRef.current = null;
+    }
+  }, []);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -566,7 +854,7 @@ function App() {
                         newAspectVal =
                           parseFloat(parts[0]) / parseFloat(parts[1]);
                       }
-                    } else {
+                    } else if (naturalWidth && naturalHeight) {
                       newAspectVal = naturalWidth / naturalHeight;
                     }
                     const newCenteredPercentCrop = centerAspectCrop(
@@ -574,14 +862,23 @@ function App() {
                       naturalHeight,
                       newAspectVal || 1
                     );
-                    const newCenteredDisplayPixelCrop = convertToPixelCrop(
+
+                    const pixelCropTargetWidth = displayWidth * zoom;
+                    const pixelCropTargetHeight = displayHeight * zoom;
+
+                    const contentRelativeNewPixelCrop = convertToPixelCrop(
                       newCenteredPercentCrop,
-                      displayWidth,
-                      displayHeight
+                      pixelCropTargetWidth,
+                      pixelCropTargetHeight
                     );
-                    setCrop(newCenteredDisplayPixelCrop);
-                    setCompletedCrop(newCenteredDisplayPixelCrop);
-                    updateSidebarInputs(newCenteredDisplayPixelCrop);
+                    const viewportRelativeNewPixelCrop = {
+                      ...contentRelativeNewPixelCrop,
+                      x: contentRelativeNewPixelCrop.x + pan.x,
+                      y: contentRelativeNewPixelCrop.y + pan.y,
+                    };
+                    setCrop(viewportRelativeNewPixelCrop);
+                    setCompletedCrop(viewportRelativeNewPixelCrop);
+                    updateSidebarInputs(viewportRelativeNewPixelCrop);
                   }
                 }}
               >
@@ -626,6 +923,42 @@ function App() {
                 onChange={(e) => handleCropDimensionChange(e.target.value, "y")}
                 placeholder="px"
               />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-white font-medium">Zoom Controls</h3>
+            <div className="flex items-center justify-start gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={zoomOut}
+                disabled={!imageSrc || zoom <= 0.1}
+                aria-label="Zoom out"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="text-sm w-16 text-center tabular-nums">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={zoomIn}
+                disabled={!imageSrc || zoom >= 10}
+                aria-label="Zoom in"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleResetView}
+                disabled={!imageSrc}
+                aria-label="Reset view"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
@@ -706,7 +1039,12 @@ function App() {
                       {imageSrc ? (
                         <div
                           ref={cropAreaRef}
-                          className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px]"
+                          className="relative w-full flex-1 flex items-center justify-center bg-[rgba(0,0,0,0.3)] min-h-[300px] overflow-hidden"
+                          onWheel={handleWheel}
+                          onTouchStart={handlePinchStart}
+                          onTouchMove={handlePinchMove}
+                          onTouchEnd={handlePinchEnd}
+                          style={{ touchAction: "none" }}
                         >
                           {" "}
                           <ReactCrop
@@ -746,6 +1084,9 @@ function App() {
                               style={{
                                 maxHeight: "calc(100vh - 300px)",
                                 maxWidth: "100%",
+                                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                                transformOrigin: "0 0",
+                                cursor: "grab",
                               }}
                             />
                           </ReactCrop>
