@@ -848,7 +848,7 @@ function App() {
               <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
               <Select
                 value={aspectRatio}
-                onValueChange={(value) => {
+                onValueChange={(value: string) => {
                   setAspectRatio(value);
                   if (imgRef.current && imageSrc) {
                     const imageElement = imgRef.current;
