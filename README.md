@@ -33,7 +33,7 @@ or
 npm run dev-network
 ```
 
-to start a development server on your local network (convenient meaning for testing UI layout on a phone)
+to start a development server on your local network (convenient for testing UI layout on a phone)
 
 ### Contributing
 Pull requests are welcome, but I request that you format your code using the [Prettier](https://prettier.io/docs/) formatter, as that is the code style I prefer.
