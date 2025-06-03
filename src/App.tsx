@@ -40,10 +40,12 @@ import { Menu as MenuIcon, Plus, Minus } from "lucide-react";
 const ASPECT_RATIO_OPTIONS = {
   FREE: "free",
   SQUARE: "1:1",
+  PHOTO_PRINT: "3:2",
   STANDARD: "4:3",
+  MEDIUM_FORMAT: "5:4",
+  VERTICAL_WIDESCREEN: "9:16",
   WIDESCREEN: "16:9",
 };
-
 interface CropInputValues {
   width: string;
   height: string;
@@ -897,8 +899,17 @@ function App() {
                   <SelectItem value={ASPECT_RATIO_OPTIONS.SQUARE}>
                     1:1 (Square)
                   </SelectItem>
+                  <SelectItem value={ASPECT_RATIO_OPTIONS.PHOTO_PRINT}>
+                    3:2 (Photo Print)
+                  </SelectItem>
                   <SelectItem value={ASPECT_RATIO_OPTIONS.STANDARD}>
                     4:3 (Standard)
+                  </SelectItem>
+                  <SelectItem value={ASPECT_RATIO_OPTIONS.MEDIUM_FORMAT}>
+                    5:4 (Medium Format)
+                  </SelectItem>
+                  <SelectItem value={ASPECT_RATIO_OPTIONS.VERTICAL_WIDESCREEN}>
+                    9:16 (Vertical Widescreen)
                   </SelectItem>
                   <SelectItem value={ASPECT_RATIO_OPTIONS.WIDESCREEN}>
                     16:9 (Widescreen)
