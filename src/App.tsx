@@ -562,7 +562,7 @@ function App() {
     const width = previewCanvasRef.current.width;
     const height = previewCanvasRef.current.height;
 
-    return `${baseName} (${width}x${height}).${extension}`;
+    return `${baseName} (${width}x${height}) (aurora.samola.net).${extension}`;
   };
 
   const handleReset = () => {
