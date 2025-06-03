@@ -816,7 +816,11 @@ function App() {
             <h3 className="text-white font-medium">File Picker</h3>
             <div ref={fileInputContainerRef} className="space-y-2">
               {" "}
-              <Input type="file" accept="image/*" onChange={onFileChange} />
+              <Input
+                type="file"
+                accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                onChange={onFileChange}
+              />
             </div>
 
             <h3 className="text-white font-medium">Crop Selection</h3>
