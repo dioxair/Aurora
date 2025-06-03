@@ -1042,8 +1042,8 @@ function App() {
               <CardHeader>
                 <CardTitle>Aurora</CardTitle>
                 <CardDescription>
-                  Easily crop your images locally and privately, with a modern
-                  UI.
+                  A simple tool with a modern UI for quickly cropping your
+                  images.
                 </CardDescription>
               </CardHeader>
               <Separator />

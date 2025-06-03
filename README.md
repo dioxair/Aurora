@@ -1,3 +1,3 @@
 # Aurora
 
-## Easily crop your images locally and privately, with a modern UI.
+## A simple tool with a modern UI for quickly cropping your images.
