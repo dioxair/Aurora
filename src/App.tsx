@@ -35,7 +35,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Menu as MenuIcon, Plus, Minus, RefreshCw } from "lucide-react";
+import { Menu as MenuIcon, Plus, Minus } from "lucide-react";
+
+const ASPECT_RATIO_OPTIONS = {
+  FREE: "free",
+  SQUARE: "1:1",
+  STANDARD: "4:3",
+  WIDESCREEN: "16:9",
+};
+
+interface CropInputValues {
+  width: string;
+  height: string;
+  x: string;
+  y: string;
+}
 
 function centerAspectCrop(
   mediaWidth: number,
@@ -67,11 +81,15 @@ function App() {
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [tabValue, setTabValue] = useState("crop");
   const [fileType, setFileType] = useState("image/jpeg");
-  const [aspectRatio, setAspectRatio] = useState<string>("free");
-  const [cropWidth, setCropWidth] = useState<string>("");
-  const [cropHeight, setCropHeight] = useState<string>("");
-  const [positionX, setPositionX] = useState<string>("");
-  const [positionY, setPositionY] = useState<string>("");
+  const [aspectRatio, setAspectRatio] = useState<string>(
+    ASPECT_RATIO_OPTIONS.FREE
+  );
+  const [cropInputValues, setCropInputValues] = useState<CropInputValues>({
+    width: "",
+    height: "",
+    x: "",
+    y: "",
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileView, setIsMobileView] = useState<boolean>(false);
 
@@ -95,7 +113,7 @@ function App() {
 
   const ZOOM_STEP = 0.2;
 
-  const updateSidebarInputsCallback = useCallback(
+  const updateCropInputDisplayValues = useCallback(
     (displayPixelCrop: PixelCrop | undefined) => {
       if (
         displayPixelCrop &&
@@ -111,26 +129,17 @@ function App() {
         const cropXOnImageContentScaled = displayPixelCrop.x - pan.x;
         const cropYOnImageContentScaled = displayPixelCrop.y - pan.y;
 
-        setCropWidth(
-          String(Math.round((displayPixelCrop.width / zoom) * scaleX))
-        );
-        setCropHeight(
-          String(Math.round((displayPixelCrop.height / zoom) * scaleY))
-        );
-        setPositionX(
-          String(Math.round((cropXOnImageContentScaled / zoom) * scaleX))
-        );
-        setPositionY(
-          String(Math.round((cropYOnImageContentScaled / zoom) * scaleY))
-        );
+        setCropInputValues({
+          width: String(Math.round((displayPixelCrop.width / zoom) * scaleX)),
+          height: String(Math.round((displayPixelCrop.height / zoom) * scaleY)),
+          x: String(Math.round((cropXOnImageContentScaled / zoom) * scaleX)),
+          y: String(Math.round((cropYOnImageContentScaled / zoom) * scaleY)),
+        });
       } else if (!displayPixelCrop) {
-        setCropWidth("");
-        setCropHeight("");
-        setPositionX("");
-        setPositionY("");
+        setCropInputValues({ width: "", height: "", x: "", y: "" });
       }
     },
-    [imgRef, zoom, pan]
+    [imgRef, zoom, pan, setCropInputValues]
   );
 
   const {
@@ -157,7 +166,7 @@ function App() {
     setTabValue,
     imgRef,
     aspectRatio,
-    updateSidebarInputs: updateSidebarInputsCallback,
+    updateSidebarInputs: updateCropInputDisplayValues,
     triggerHandleCropImage: async () => handleCropImage(),
     centerAspectCropFn: centerAspectCrop,
     interactionRefs: {
@@ -234,7 +243,7 @@ function App() {
 
       let initialAspect = 1 / 1;
       if (
-        aspectRatio !== "free" &&
+        aspectRatio !== ASPECT_RATIO_OPTIONS.FREE &&
         !(imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial)
       ) {
         const parts = aspectRatio.split(":");
@@ -279,7 +288,7 @@ function App() {
         (imageSrc === DUMMY_IMAGE_URL_FOR_CHECK && showTutorial)
       ) {
         setCompletedCrop(viewportRelativeInitialCrop);
-        updateSidebarInputs(viewportRelativeInitialCrop);
+        updateCropInputDisplayValues(viewportRelativeInitialCrop);
       }
     }
   };
@@ -304,12 +313,10 @@ function App() {
         valueForState = "";
       }
     }
-    console.log(valueForState);
-    console.log(numericValue);
     return { valueForState, numericValue };
   };
 
-  const updateSidebarInputs = updateSidebarInputsCallback;
+  const updateSidebarInputs = updateCropInputDisplayValues;
 
   const onCropChange = (
     displayPixelCrop: PixelCrop /*, percentCrop: Crop*/
@@ -326,19 +333,19 @@ function App() {
     [updateSidebarInputs]
   );
 
-  const handleCropDimensionChange = (
+  const handleCropInputChange = (
     inputValue: string,
-    dimension: "width" | "height" | "x" | "y"
+    dimension: keyof CropInputValues
   ) => {
     const {
       valueForState: processedStringForState,
       numericValue: numericValueForLogic,
     } = sanitizeNumericInput(inputValue);
 
-    if (dimension === "width") setCropWidth(processedStringForState);
-    else if (dimension === "height") setCropHeight(processedStringForState);
-    else if (dimension === "x") setPositionX(processedStringForState);
-    else if (dimension === "y") setPositionY(processedStringForState);
+    setCropInputValues((prev) => ({
+      ...prev,
+      [dimension]: processedStringForState,
+    }));
 
     if (
       !isNaN(numericValueForLogic) &&
@@ -381,7 +388,7 @@ function App() {
           ...currentContentRelativeCrop,
           x: currentContentRelativeCrop.x + pan.x,
           y: currentContentRelativeCrop.y + pan.y,
-          unit: "px" as "px", // dumb linter error ignore, just trying to make sure its px
+          unit: "px",
           width: currentContentRelativeCrop.width,
           height: currentContentRelativeCrop.height,
         };
@@ -577,7 +584,7 @@ function App() {
       setPan(newPan);
 
       const resetAspect =
-        aspectRatio === "free"
+        aspectRatio === ASPECT_RATIO_OPTIONS.FREE
           ? 1 / 1
           : parseFloat(aspectRatio.split(":")[0]) /
               parseFloat(aspectRatio.split(":")[1]) || 1 / 1;
@@ -607,7 +614,7 @@ function App() {
       setCompletedCrop(viewportRelativePixelCrop);
       updateSidebarInputs(viewportRelativePixelCrop);
     }
-    setAspectRatio("free");
+    setAspectRatio(ASPECT_RATIO_OPTIONS.FREE);
   };
 
   const handleResetView = useCallback(() => {
@@ -815,10 +822,8 @@ function App() {
               <Label htmlFor="width">Width</Label>
               <Input
                 id="width"
-                value={cropWidth}
-                onChange={(e) =>
-                  handleCropDimensionChange(e.target.value, "width")
-                }
+                value={cropInputValues.width}
+                onChange={(e) => handleCropInputChange(e.target.value, "width")}
                 placeholder="px"
               />
             </div>
@@ -826,9 +831,9 @@ function App() {
               <Label htmlFor="height">Height</Label>
               <Input
                 id="height"
-                value={cropHeight}
+                value={cropInputValues.height}
                 onChange={(e) =>
-                  handleCropDimensionChange(e.target.value, "height")
+                  handleCropInputChange(e.target.value, "height")
                 }
                 placeholder="px"
               />
@@ -848,7 +853,7 @@ function App() {
                       height: displayHeight,
                     } = imageElement;
                     let newAspectVal = 1 / 1;
-                    if (value !== "free") {
+                    if (value !== ASPECT_RATIO_OPTIONS.FREE) {
                       const parts = value.split(":");
                       if (parts.length === 2) {
                         newAspectVal =
@@ -886,10 +891,18 @@ function App() {
                   <SelectValue placeholder="Select aspect ratio" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="free">Free Form</SelectItem>
-                  <SelectItem value="1:1">1:1 (Square)</SelectItem>
-                  <SelectItem value="4:3">4:3 (Standard)</SelectItem>
-                  <SelectItem value="16:9">16:9 (Widescreen)</SelectItem>
+                  <SelectItem value={ASPECT_RATIO_OPTIONS.FREE}>
+                    Free Form
+                  </SelectItem>
+                  <SelectItem value={ASPECT_RATIO_OPTIONS.SQUARE}>
+                    1:1 (Square)
+                  </SelectItem>
+                  <SelectItem value={ASPECT_RATIO_OPTIONS.STANDARD}>
+                    4:3 (Standard)
+                  </SelectItem>
+                  <SelectItem value={ASPECT_RATIO_OPTIONS.WIDESCREEN}>
+                    16:9 (Widescreen)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -910,8 +923,8 @@ function App() {
               <Label htmlFor="position-x">Position (X)</Label>
               <Input
                 id="position-x"
-                value={positionX}
-                onChange={(e) => handleCropDimensionChange(e.target.value, "x")}
+                value={cropInputValues.x}
+                onChange={(e) => handleCropInputChange(e.target.value, "x")}
                 placeholder="px"
               />
             </div>
@@ -919,8 +932,8 @@ function App() {
               <Label htmlFor="position-y">Position (Y)</Label>
               <Input
                 id="position-y"
-                value={positionY}
-                onChange={(e) => handleCropDimensionChange(e.target.value, "y")}
+                value={cropInputValues.y}
+                onChange={(e) => handleCropInputChange(e.target.value, "y")}
                 placeholder="px"
               />
             </div>
@@ -950,16 +963,14 @@ function App() {
               >
                 <Plus className="h-4 w-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleResetView}
-                disabled={!imageSrc}
-                aria-label="Reset view"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
             </div>
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={handleResetView}
+            >
+              Reset view
+            </Button>
           </div>
 
           <div className="space-y-2">
@@ -1052,7 +1063,7 @@ function App() {
                             onChange={onCropChange}
                             onComplete={handleCropComplete}
                             aspect={
-                              aspectRatio === "free"
+                              aspectRatio === ASPECT_RATIO_OPTIONS.FREE
                                 ? undefined
                                 : parseFloat(aspectRatio.split(":")[0]) /
                                   parseFloat(aspectRatio.split(":")[1])
